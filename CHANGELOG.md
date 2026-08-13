@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `Profil Medis Harian` form on Home page (`/`) conforming to `DESIGN.md` brutalist-editorial design system and WCAG 2.1 AAA accessibility guidelines.
+- Added Shadcn UI `Card`, `Badge`, and `Slider` components in `src/components/ui/`.
+- Added `@radix-ui/react-slider` dependency.
 - Added `react-router-dom` dependency for client-side routing.
 - Added lazy-loaded page components for Home (`/`), Calibration (`/calibration`), Tracking (`/tracking`), and Summary (`/summary`).
 - Configured Suspense-wrapped sequential page routing in `App.tsx` following Vercel React performance best practices.
@@ -22,12 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Silenced TypeScript 6.0 `baseUrl` deprecation warning by adding `"ignoreDeprecations": "6.0"` in `tsconfig.json` and `tsconfig.app.json`.
 
+### Removed
 
+- Removed unused Vite boilerplate CSS file (`src/App.css`).
 
 ## [0.1.0] - 2026-08-13
 
 ### Added
 
 - Initial project setup with Vite, React, TypeScript, and Tailwind CSS.
-
-
