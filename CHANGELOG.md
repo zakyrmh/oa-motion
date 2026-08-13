@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added data persistence via `localStorage` and React Router state forwarding across Home (`/`), Calibration (`/calibration`), and Tracking (`/tracking`) pages.
 - Added AR camera calibration guide screen on `/calibration` featuring camera feed preview, side-profile body silhouette overlay, distance badge, audio instruction card, and status pill.
 - Added `Profil Medis Harian` form on Home page (`/`) conforming to `DESIGN.md` brutalist-editorial design system and WCAG 2.1 AAA accessibility guidelines.
 - Added Shadcn UI `Card`, `Badge`, and `Slider` components in `src/components/ui/`.

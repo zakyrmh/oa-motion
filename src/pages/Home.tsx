@@ -6,15 +6,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 
+const STORAGE_KEY = "oa_motion_medical_profile";
+
+export interface MedicalProfile {
+  oaGrade: "grade1" | "grade2" | "grade3";
+  painScale: number;
+  hasKneeSurgery: boolean;
+}
+
 export default function Home() {
   const navigate = useNavigate();
-  const [oaGrade, setOaGrade] = useState<"grade1" | "grade2" | "grade3">(
-    "grade2",
-  );
-  const [painScale, setPainScale] = useState<number[]>([4]);
-  const [hasKneeSurgery, setHasKneeSurgery] = useState<boolean>(false);
 
-  const currentPain = painScale[0] ?? 4;
+  const [profile, setProfile] = useState<MedicalProfile>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore JSON parse error
+    }
+    return { oaGrade: "grade2", painScale: 4, hasKneeSurgery: false };
+  });
 
   const getPainBadge = (val: number) => {
     if (val <= 3)
@@ -33,7 +44,16 @@ export default function Home() {
     };
   };
 
-  const painBadge = getPainBadge(currentPain);
+  const painBadge = getPainBadge(profile.painScale);
+
+  const handleNext = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    } catch {
+      // ignore quota error
+    }
+    navigate("/calibration", { state: profile });
+  };
 
   return (
     <div className="min-h-screen bg-[#e5e5e5] text-[#000000] flex flex-col justify-between max-w-md mx-auto font-sans pb-28">
@@ -99,12 +119,15 @@ export default function Home() {
                 desc: "Penyempitan celah sendi berat",
               },
             ].map((item) => {
-              const isSelected = oaGrade === item.id;
+              const isSelected = profile.oaGrade === item.id;
               return (
                 <Card
                   key={item.id}
                   onClick={() =>
-                    setOaGrade(item.id as "grade1" | "grade2" | "grade3")
+                    setProfile((prev) => ({
+                      ...prev,
+                      oaGrade: item.id as MedicalProfile["oaGrade"],
+                    }))
                   }
                   className={`cursor-pointer transition-all rounded-3xl border-2 shadow-none ${
                     isSelected
@@ -164,8 +187,13 @@ export default function Home() {
 
             <div className="flex flex-col gap-4">
               <Slider
-                value={painScale}
-                onValueChange={setPainScale}
+                value={[profile.painScale]}
+                onValueChange={(val) =>
+                  setProfile((prev) => ({
+                    ...prev,
+                    painScale: val[0] ?? prev.painScale,
+                  }))
+                }
                 min={1}
                 max={10}
                 step={1}
@@ -206,9 +234,11 @@ export default function Home() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => setHasKneeSurgery(false)}
+                onClick={() =>
+                  setProfile((prev) => ({ ...prev, hasKneeSurgery: false }))
+                }
                 className={`h-11 px-5 rounded-full font-bold text-sm shadow-none transition-all ${
-                  !hasKneeSurgery
+                  !profile.hasKneeSurgery
                     ? "bg-[#000000] text-[#ffffff] hover:bg-[#000000] hover:text-[#ffffff]"
                     : "text-[#444444] hover:text-[#000000] hover:bg-transparent"
                 }`}
@@ -218,9 +248,11 @@ export default function Home() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => setHasKneeSurgery(true)}
+                onClick={() =>
+                  setProfile((prev) => ({ ...prev, hasKneeSurgery: true }))
+                }
                 className={`h-11 px-5 rounded-full font-bold text-sm shadow-none transition-all ${
-                  hasKneeSurgery
+                  profile.hasKneeSurgery
                     ? "bg-[#000000] text-[#ffffff] hover:bg-[#000000] hover:text-[#ffffff]"
                     : "text-[#444444] hover:text-[#000000] hover:bg-transparent"
                 }`}
@@ -236,7 +268,7 @@ export default function Home() {
       <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-[#e5e5e5]/95 backdrop-blur-md z-20">
         <Button
           type="button"
-          onClick={() => navigate("/calibration")}
+          onClick={handleNext}
           className="w-full h-14 bg-[#000000] hover:bg-[#2f2f2f] text-[#ffffff] font-extrabold text-base uppercase tracking-tight rounded-2xl shadow-none active:scale-[0.99] transition-all flex items-center justify-center gap-2"
         >
           LANJUTKAN KE KALIBRASI KAMERA

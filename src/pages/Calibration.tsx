@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Volume2,
@@ -11,11 +11,26 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+const STORAGE_KEY = "oa_motion_medical_profile";
+
 export default function Calibration() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Retrieve medical profile from router state or localStorage fallback
+  const profileData =
+    location.state ||
+    (() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
+      }
+    })();
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -39,6 +54,10 @@ export default function Calibration() {
       }
     };
   }, []);
+
+  const handleStartExercise = () => {
+    navigate("/tracking", { state: profileData });
+  };
 
   return (
     <div className="relative min-h-screen bg-[#000000] text-[#ffffff] flex flex-col justify-between max-w-md mx-auto font-sans overflow-hidden select-none">
@@ -168,7 +187,7 @@ export default function Calibration() {
         {/* Bottom CTA Button */}
         <Button
           type="button"
-          onClick={() => navigate("/tracking")}
+          onClick={handleStartExercise}
           className="w-full h-14 bg-[#d1ffca] hover:bg-[#b8f5b0] text-[#000000] font-extrabold text-base uppercase tracking-tight rounded-2xl shadow-none active:scale-[0.99] transition-all flex items-center justify-center gap-2"
         >
           MULAI LATIHAN SEKARANG
