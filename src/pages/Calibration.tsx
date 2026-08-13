@@ -1,63 +1,88 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import {
-  ArrowLeft,
-  Volume2,
-  VolumeX,
-  CheckCircle2,
-  AudioLines,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { ArrowLeft, Volume2, VolumeX, CheckCircle2, AudioLines } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
-const STORAGE_KEY = "oa_motion_medical_profile";
+const STORAGE_KEY = 'oa_motion_medical_profile'
+const INSTRUCTION_TEXT = 'Posisikan smartphone sejajar lutut Anda pada jarak 1.5 hingga 2 meter.'
 
 export default function Calibration() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [isAudioMuted, setIsAudioMuted] = useState(false)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Retrieve medical profile from router state or localStorage fallback
-  const profileData =
-    location.state ||
-    (() => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? JSON.parse(saved) : null;
-      } catch {
-        return null;
-      }
-    })();
+  const profileData = location.state || (() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })()
 
+  // Web Speech API Text-To-Speech (Indonesian voice)
   useEffect(() => {
-    let stream: MediaStream | null = null;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+
+    const speak = () => {
+      window.speechSynthesis.cancel()
+      if (isAudioMuted) return
+
+      const utterance = new SpeechSynthesisUtterance(INSTRUCTION_TEXT)
+      utterance.lang = 'id-ID'
+      utterance.rate = 0.9
+
+      const voices = window.speechSynthesis.getVoices()
+      const idVoice = voices.find((v) => v.lang.includes('id') || v.lang.includes('ID'))
+      if (idVoice) utterance.voice = idVoice
+
+      window.speechSynthesis.speak(utterance)
+    }
+
+    speak()
+
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = speak
+    }
+
+    return () => {
+      window.speechSynthesis.cancel()
+    }
+  }, [isAudioMuted])
+
+  // Camera Access
+  useEffect(() => {
+    let stream: MediaStream | null = null
     async function startCamera() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-        });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          setIsCameraActive(true);
+          videoRef.current.srcObject = stream
+          setIsCameraActive(true)
         }
       } catch {
-        setIsCameraActive(false);
+        setIsCameraActive(false)
       }
     }
-    startCamera();
+    startCamera()
     return () => {
       if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach((track) => track.stop())
       }
-    };
-  }, []);
+    }
+  }, [])
 
   const handleStartExercise = () => {
-    navigate("/tracking", { state: profileData });
-  };
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+    navigate('/tracking', { state: profileData })
+  }
 
   return (
     <div className="relative min-h-screen bg-[#000000] text-[#ffffff] flex flex-col justify-between max-w-md mx-auto font-sans overflow-hidden select-none">
@@ -72,13 +97,11 @@ export default function Calibration() {
             className="w-full h-full object-cover scale-x-[-1]"
           />
         ) : (
-          <div className="w-full h-full bg-linear-to-b from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+          <div className="w-full h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-400">
             <span className="font-mono text-xs uppercase tracking-widest text-[#d1ffca] mb-2">
               SIMULASI PREVIEW KAMERA AR
             </span>
-            <p className="text-sm font-medium">
-              Kamera melacak posisi tubuh Anda secara Edge-AI
-            </p>
+            <p className="text-sm font-medium">Kamera melacak posisi tubuh Anda secara Edge-AI</p>
           </div>
         )}
 
@@ -87,11 +110,16 @@ export default function Calibration() {
       </div>
 
       {/* Top Bar Header Overlay */}
-      <header className="relative z-20 p-4 flex items-center justify-between gap-3 bg-linear-to-b from-black/80 to-transparent">
+      <header className="relative z-20 p-4 flex items-center justify-between gap-3 bg-gradient-to-b from-black/80 to-transparent">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/")}
+          onClick={() => {
+            if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+              window.speechSynthesis.cancel()
+            }
+            navigate('/')
+          }}
           className="size-12 rounded-full bg-black/40 hover:bg-black/60 text-[#ffffff] border border-white/10 shadow-none shrink-0"
           aria-label="Kembali ke Profil"
         >
@@ -107,7 +135,7 @@ export default function Calibration() {
           size="icon"
           onClick={() => setIsAudioMuted(!isAudioMuted)}
           className="size-12 rounded-full bg-black/40 hover:bg-black/60 text-[#ffffff] border border-white/10 shadow-none shrink-0"
-          aria-label={isAudioMuted ? "Nyalakan Suara" : "Matikan Suara"}
+          aria-label={isAudioMuted ? 'Nyalakan Suara' : 'Matikan Suara'}
         >
           {isAudioMuted ? (
             <VolumeX className="size-6 text-[#979797]" />
@@ -125,7 +153,7 @@ export default function Calibration() {
         </Badge>
 
         {/* Bounding Box / Side-Profile Body Silhouette */}
-        <div className="relative w-64 h-80 rounded-4xl border-4 border-dashed border-[#d1ffca] flex flex-col items-center justify-center p-4 bg-[#d1ffca]/5 backdrop-blur-[2px] animate-pulse">
+        <div className="relative w-64 h-80 rounded-[32px] border-4 border-dashed border-[#d1ffca] flex flex-col items-center justify-center p-4 bg-[#d1ffca]/5 backdrop-blur-[2px] animate-pulse">
           {/* Side-Profile SVG Silhouette Graphic */}
           <svg
             viewBox="0 0 100 160"
@@ -147,14 +175,7 @@ export default function Calibration() {
             {/* Arm Side Bend */}
             <path d="M48 42 L58 60 L48 78" />
             {/* Knee Landmark Highlight */}
-            <circle
-              cx="56"
-              cy="125"
-              r="5"
-              fill="#fff100"
-              stroke="#000000"
-              strokeWidth="2"
-            />
+            <circle cx="56" cy="125" r="5" fill="#fff100" stroke="#000000" strokeWidth="2" />
           </svg>
 
           {/* Corner Markers */}
@@ -172,15 +193,14 @@ export default function Calibration() {
       </main>
 
       {/* Lower-Middle Floating Instruction Card & Bottom CTA */}
-      <footer className="relative z-20 p-4 flex flex-col gap-4 bg-linear-to-t from-black via-black/90 to-transparent">
+      <footer className="relative z-20 p-4 flex flex-col gap-4 bg-gradient-to-t from-black via-black/90 to-transparent">
         {/* Audio & Instruction Card */}
-        <Card className="bg-[#ffffff] text-[#000000] rounded-3xl border-none shadow-xl p-4 flex items-center gap-4">
+        <Card className="bg-[#ffffff] text-[#000000] rounded-[24px] border-none shadow-xl p-4 flex items-center gap-4">
           <div className="size-12 rounded-2xl bg-[#000000] text-[#d1ffca] flex items-center justify-center shrink-0">
             <AudioLines className="size-6 animate-pulse" />
           </div>
           <p className="text-sm sm:text-base font-bold leading-snug text-[#000000]">
-            &ldquo;Posisikan smartphone sejajar lutut Anda pada jarak 1.5 – 2
-            meter&rdquo;
+            &ldquo;Posisikan smartphone sejajar lutut Anda pada jarak 1.5 – 2 meter&rdquo;
           </p>
         </Card>
 
@@ -188,11 +208,11 @@ export default function Calibration() {
         <Button
           type="button"
           onClick={handleStartExercise}
-          className="w-full h-14 bg-[#d1ffca] hover:bg-[#b8f5b0] text-[#000000] font-extrabold text-base uppercase tracking-tight rounded-2xl shadow-none active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+          className="w-full h-14 bg-[#d1ffca] hover:bg-[#b8f5b0] text-[#000000] font-extrabold text-base uppercase tracking-tight rounded-[16px] shadow-none active:scale-[0.99] transition-all flex items-center justify-center gap-2"
         >
           MULAI LATIHAN SEKARANG
         </Button>
       </footer>
     </div>
-  );
+  )
 }
