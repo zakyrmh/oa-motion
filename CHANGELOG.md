@@ -9,11 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `react-router-dom` dependency for client-side routing.
+- Added lazy-loaded page components for Home (`/`), Calibration (`/calibration`), Tracking (`/tracking`), and Summary (`/summary`).
+- Configured Suspense-wrapped sequential page routing in `App.tsx` following Vercel React performance best practices.
 - Installed and configured Git hooks with Husky (`^9.1.7`) and `lint-staged` (`^17.3.0`).
 - Installed and configured Commitlint (`@commitlint/cli`, `@commitlint/config-conventional`) for commit message validation.
 - Installed and configured Commitizen (`commitizen`, `cz-conventional-changelog`) with `npm run commit` script.
 - Installed shadcn/ui (v4) with Base UI (`@base-ui/react`) component library and Nova preset.
 - Added path alias (`@/*`) configuration in `vite.config.ts`, `tsconfig.json`, and `tsconfig.app.json`.
+
+### Fixed
+
+- Silenced TypeScript 6.0 `baseUrl` deprecation warning by adding `"ignoreDeprecations": "6.0"` in `tsconfig.json` and `tsconfig.app.json`.
+
 
 
 ## [0.1.0] - 2026-08-13
