@@ -1,0 +1,60 @@
+import type { Point2D, Point3D } from '@/types/kinematics';
+
+/**
+ * Calculates the interior angle (in degrees) formed by three 2D points (P1 - P2 - P3)
+ * where P2 is the vertex (e.g. Knee vertex between Hip and Ankle).
+ *
+ * Uses vector dot product: cos(theta) = (v1 . v2) / (|v1| * |v2|)
+ */
+export function calculateJointAngle2D(p1: Point2D, p2: Point2D, p3: Point2D): number {
+  const v1 = { x: p1.x - p2.x, y: p1.y - p2.y };
+  const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+
+  const dotProduct = v1.x * v2.x + v1.y * v2.y;
+  const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+  const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+
+  if (mag1 === 0 || mag2 === 0) return 180;
+
+  let cosTheta = dotProduct / (mag1 * mag2);
+  // Clamp value to handle floating point errors
+  cosTheta = Math.max(-1.0, Math.min(1.0, cosTheta));
+
+  const angleRad = Math.acos(cosTheta);
+  const angleDeg = (angleRad * 180) / Math.PI;
+
+  return Math.round(angleDeg * 10) / 10;
+}
+
+/**
+ * Calculates the interior angle (in degrees) for 3D coordinates.
+ */
+export function calculateJointAngle3D(p1: Point3D, p2: Point3D, p3: Point3D): number {
+  const z1 = p1.z ?? 0;
+  const z2 = p2.z ?? 0;
+  const z3 = p3.z ?? 0;
+
+  const v1 = { x: p1.x - p2.x, y: p1.y - p2.y, z: z1 - z2 };
+  const v2 = { x: p3.x - p2.x, y: p3.y - p2.y, z: z3 - z2 };
+
+  const dotProduct = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+  const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
+  const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
+
+  if (mag1 === 0 || mag2 === 0) return 180;
+
+  let cosTheta = dotProduct / (mag1 * mag2);
+  cosTheta = Math.max(-1.0, Math.min(1.0, cosTheta));
+
+  const angleRad = Math.acos(cosTheta);
+  const angleDeg = (angleRad * 180) / Math.PI;
+
+  return Math.round(angleDeg * 10) / 10;
+}
+
+/**
+ * Convenience helper specifically for Knee Flexion Angle (Hip - Knee - Ankle)
+ */
+export function calculateKneeAngle(hip: Point2D, knee: Point2D, ankle: Point2D): number {
+  return calculateJointAngle2D(hip, knee, ankle);
+}

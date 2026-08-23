@@ -1,82 +1,33 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-
-const STORAGE_KEY = "oa_motion_medical_profile";
-
-export interface MedicalProfile {
-  oaGrade: "grade1" | "grade2" | "grade3";
-  painScale: number;
-  hasKneeSurgery: boolean;
-}
+import { AppLayout } from "@/components/layouts/AppLayout";
+import { Header } from "@/components/common/Header";
+import { useMedicalProfile } from "@/hooks/useMedicalProfile";
+import { OA_GRADE_OPTIONS, getPainBadgeConfig } from "@/constants/clinical";
+import type { OAGrade } from "@/types/clinical";
 
 export default function Home() {
   const navigate = useNavigate();
+  const { profile, updateProfile } = useMedicalProfile();
 
-  const [profile, setProfile] = useState<MedicalProfile>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore JSON parse error
-    }
-    return { oaGrade: "grade2", painScale: 4, hasKneeSurgery: false };
-  });
-
-  const getPainBadge = (val: number) => {
-    if (val <= 3)
-      return {
-        text: `${val}/10 — NYERI RINGAN`,
-        className: "bg-[#d1ffca] text-[#000000]",
-      };
-    if (val <= 6)
-      return {
-        text: `${val}/10 — NYERI SEDANG`,
-        className: "bg-[#fff100] text-[#000000]",
-      };
-    return {
-      text: `${val}/10 — NYERI BERAT`,
-      className: "bg-[#000000] text-[#ffffff]",
-    };
-  };
-
-  const painBadge = getPainBadge(profile.painScale);
+  const painBadge = getPainBadgeConfig(profile.painScale);
 
   const handleNext = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    } catch {
-      // ignore quota error
-    }
-    navigate("/calibration", { state: profile });
+    navigate("/calibration");
   };
 
   return (
-    <div className="min-h-screen bg-[#e5e5e5] text-[#000000] flex flex-col justify-between max-w-md mx-auto font-sans pb-28">
+    <AppLayout className="pb-28">
       {/* Top Bar Header */}
-      <header className="sticky top-0 z-20 bg-[#e5e5e5]/90 backdrop-blur-md p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/")}
-            className="size-12 rounded-full bg-[#f3f3f3] hover:bg-[#c6c6c6] text-[#000000] border-none shadow-none shrink-0"
-            aria-label="Kembali"
-          >
-            <ArrowLeft className="size-6 text-[#000000]" />
-          </Button>
-          <Badge className="bg-[#d1ffca] text-[#000000] hover:bg-[#d1ffca] font-mono text-xs tracking-tight rounded-full px-3 py-1 font-semibold uppercase border-none shadow-none">
-            LANGKAH 1 DARI 3: PENGATURAN PROFIL
-          </Badge>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-[#000000] px-1">
-          PROFIL MEDIS HARIAN
-        </h1>
-      </header>
+      <Header
+        title="PROFIL MEDIS HARIAN"
+        stepText="LANGKAH 1 DARI 3: PENGATURAN PROFIL"
+        onBack={() => navigate("/")}
+      />
 
       {/* Main Form Body */}
       <main className="p-4 flex flex-col gap-6 flex-1">
@@ -102,33 +53,12 @@ export default function Home() {
             role="radiogroup"
             aria-label="Tingkat Keparahan OA"
           >
-            {[
-              {
-                id: "grade1",
-                title: "GRADE 1 (RINGAN)",
-                desc: "Penyempitan celah sendi awal",
-              },
-              {
-                id: "grade2",
-                title: "GRADE 2 (SEDANG)",
-                desc: "Osteofit bermakna & penyempitan sedang",
-              },
-              {
-                id: "grade3",
-                title: "GRADE 3 (BERAT)",
-                desc: "Penyempitan celah sendi berat",
-              },
-            ].map((item) => {
+            {OA_GRADE_OPTIONS.map((item) => {
               const isSelected = profile.oaGrade === item.id;
               return (
                 <Card
                   key={item.id}
-                  onClick={() =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      oaGrade: item.id as MedicalProfile["oaGrade"],
-                    }))
-                  }
+                  onClick={() => updateProfile({ oaGrade: item.id as OAGrade })}
                   className={`cursor-pointer transition-all rounded-3xl border-2 shadow-none ${
                     isSelected
                       ? "bg-[#ffffff] border-[#000000] ring-4 ring-[#d1ffca]"
@@ -189,10 +119,7 @@ export default function Home() {
               <Slider
                 value={[profile.painScale]}
                 onValueChange={(val) =>
-                  setProfile((prev) => ({
-                    ...prev,
-                    painScale: val[0] ?? prev.painScale,
-                  }))
+                  updateProfile({ painScale: val[0] ?? profile.painScale })
                 }
                 min={1}
                 max={10}
@@ -234,9 +161,7 @@ export default function Home() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() =>
-                  setProfile((prev) => ({ ...prev, hasKneeSurgery: false }))
-                }
+                onClick={() => updateProfile({ hasKneeSurgery: false })}
                 className={`h-11 px-5 rounded-full font-bold text-sm shadow-none transition-all ${
                   !profile.hasKneeSurgery
                     ? "bg-[#000000] text-[#ffffff] hover:bg-[#000000] hover:text-[#ffffff]"
@@ -248,9 +173,7 @@ export default function Home() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() =>
-                  setProfile((prev) => ({ ...prev, hasKneeSurgery: true }))
-                }
+                onClick={() => updateProfile({ hasKneeSurgery: true })}
                 className={`h-11 px-5 rounded-full font-bold text-sm shadow-none transition-all ${
                   profile.hasKneeSurgery
                     ? "bg-[#000000] text-[#ffffff] hover:bg-[#000000] hover:text-[#ffffff]"
@@ -274,6 +197,6 @@ export default function Home() {
           LANJUTKAN KE KALIBRASI KAMERA
         </Button>
       </footer>
-    </div>
+    </AppLayout>
   );
 }

@@ -1,93 +1,48 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Volume2, VolumeX, CheckCircle2, AudioLines } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-
-const STORAGE_KEY = 'oa_motion_medical_profile'
-const INSTRUCTION_TEXT = 'Posisikan smartphone sejajar lutut Anda pada jarak 1.5 hingga 2 meter.'
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Volume2, VolumeX, CheckCircle2, AudioLines, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { AppLayout } from '@/components/layouts/AppLayout';
+import { SilhouetteGuide } from '@/components/features/calibration/SilhouetteGuide';
+import { useCamera } from '@/hooks/useCamera';
+import { useAudioCoach } from '@/hooks/useAudioCoach';
+import { useMedicalProfile } from '@/hooks/useMedicalProfile';
+import { AUDIO_PHRASES } from '@/constants/audioPhrases';
 
 export default function Calibration() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [isAudioMuted, setIsAudioMuted] = useState(false)
-  const [isCameraActive, setIsCameraActive] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const navigate = useNavigate();
+  const { profile } = useMedicalProfile();
+  const { videoRef, isCameraActive, cameraError, startCamera, toggleFacingMode } = useCamera({
+    facingMode: 'user',
+    autoStart: true,
+  });
 
-  // Retrieve medical profile from router state or localStorage fallback
-  const profileData = location.state || (() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      return saved ? JSON.parse(saved) : null
-    } catch {
-      return null
-    }
-  })()
+  const { isMuted, toggleMute, speak, stopSpeaking } = useAudioCoach(false);
 
-  // Web Speech API Text-To-Speech (Indonesian voice)
+  // Trigger spoken instruction upon entering calibration
   useEffect(() => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-
-    const speak = () => {
-      window.speechSynthesis.cancel()
-      if (isAudioMuted) return
-
-      const utterance = new SpeechSynthesisUtterance(INSTRUCTION_TEXT)
-      utterance.lang = 'id-ID'
-      utterance.rate = 0.9
-
-      const voices = window.speechSynthesis.getVoices()
-      const idVoice = voices.find((v) => v.lang.includes('id') || v.lang.includes('ID'))
-      if (idVoice) utterance.voice = idVoice
-
-      window.speechSynthesis.speak(utterance)
-    }
-
-    speak()
-
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
-      window.speechSynthesis.onvoiceschanged = speak
-    }
-
+    speak(AUDIO_PHRASES.CALIBRATION.DISTANCE_INSTRUCTION);
     return () => {
-      window.speechSynthesis.cancel()
-    }
-  }, [isAudioMuted])
-
-  // Camera Access
-  useEffect(() => {
-    let stream: MediaStream | null = null
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          setIsCameraActive(true)
-        }
-      } catch {
-        setIsCameraActive(false)
-      }
-    }
-    startCamera()
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
-      }
-    }
-  }, [])
+      stopSpeaking();
+    };
+  }, [speak, stopSpeaking]);
 
   const handleStartExercise = () => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-    }
-    navigate('/tracking', { state: profileData })
-  }
+    stopSpeaking();
+    navigate('/tracking', { state: profile });
+  };
+
+  const handleBack = () => {
+    stopSpeaking();
+    navigate('/');
+  };
 
   return (
-    <div className="relative min-h-screen bg-[#000000] text-[#ffffff] flex flex-col justify-between max-w-md mx-auto font-sans overflow-hidden select-none">
-      {/* Background Camera Feed / Soft Dark Overlay */}
-      <div className="absolute inset-0 z-0 bg-slate-900 flex items-center justify-center overflow-hidden">
+    <AppLayout variant="dark" className="relative select-none overflow-hidden">
+      {/* Background Camera Feed / Video Viewport */}
+      <div className="absolute inset-0 z-0 bg-slate-950 flex items-center justify-center overflow-hidden">
         {isCameraActive ? (
           <video
             ref={videoRef}
@@ -97,11 +52,24 @@ export default function Calibration() {
             className="w-full h-full object-cover scale-x-[-1]"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-400">
-            <span className="font-mono text-xs uppercase tracking-widest text-[#d1ffca] mb-2">
-              SIMULASI PREVIEW KAMERA AR
+          <div className="w-full h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-400 gap-3">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#d1ffca]">
+              {cameraError ? 'STATUS AKSES KAMERA' : 'MEMULAI PREVIEW KAMERA...'}
             </span>
-            <p className="text-sm font-medium">Kamera melacak posisi tubuh Anda secara Edge-AI</p>
+            <p className="text-sm font-medium max-w-xs">
+              {cameraError || 'Kamera melacak posisi tubuh Anda secara aman dengan on-device Edge AI.'}
+            </p>
+            {cameraError && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startCamera}
+                className="mt-2 rounded-full border-white/20 text-white hover:bg-white/10"
+              >
+                <RefreshCw className="size-4 mr-2" />
+                Coba Lagi
+              </Button>
+            )}
           </div>
         )}
 
@@ -114,12 +82,7 @@ export default function Calibration() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => {
-            if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-              window.speechSynthesis.cancel()
-            }
-            navigate('/')
-          }}
+          onClick={handleBack}
           className="size-12 rounded-full bg-black/40 hover:bg-black/60 text-[#ffffff] border border-white/10 shadow-none shrink-0"
           aria-label="Kembali ke Profil"
         >
@@ -130,19 +93,32 @@ export default function Calibration() {
           KALIBRASI KAMERA
         </h1>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsAudioMuted(!isAudioMuted)}
-          className="size-12 rounded-full bg-black/40 hover:bg-black/60 text-[#ffffff] border border-white/10 shadow-none shrink-0"
-          aria-label={isAudioMuted ? 'Nyalakan Suara' : 'Matikan Suara'}
-        >
-          {isAudioMuted ? (
-            <VolumeX className="size-6 text-[#979797]" />
-          ) : (
-            <Volume2 className="size-6 text-[#d1ffca]" />
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleFacingMode}
+            className="size-12 rounded-full bg-black/40 hover:bg-black/60 text-[#ffffff] border border-white/10 shadow-none shrink-0"
+            aria-label="Ganti Kamera Depan/Belakang"
+            title="Ganti Kamera"
+          >
+            <RefreshCw className="size-5 text-[#ffffff]" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleMute}
+            className="size-12 rounded-full bg-black/40 hover:bg-black/60 text-[#ffffff] border border-white/10 shadow-none shrink-0"
+            aria-label={isMuted ? 'Nyalakan Suara' : 'Matikan Suara'}
+          >
+            {isMuted ? (
+              <VolumeX className="size-6 text-[#979797]" />
+            ) : (
+              <Volume2 className="size-6 text-[#d1ffca]" />
+            )}
+          </Button>
+        </div>
       </header>
 
       {/* Center Camera Overlay & Silhouette Bounds */}
@@ -152,38 +128,8 @@ export default function Calibration() {
           JARAK IDEAL: 1.5 - 2.0 METER
         </Badge>
 
-        {/* Bounding Box / Side-Profile Body Silhouette */}
-        <div className="relative w-64 h-80 rounded-[32px] border-4 border-dashed border-[#d1ffca] flex flex-col items-center justify-center p-4 bg-[#d1ffca]/5 backdrop-blur-[2px] animate-pulse">
-          {/* Side-Profile SVG Silhouette Graphic */}
-          <svg
-            viewBox="0 0 100 160"
-            fill="none"
-            stroke="#d1ffca"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-36 h-56 opacity-80"
-          >
-            {/* Head */}
-            <circle cx="50" cy="22" r="12" className="fill-[#d1ffca]/20" />
-            {/* Torso Side View */}
-            <path d="M48 34 C44 50, 42 75, 46 95" />
-            {/* Front Leg & Knee */}
-            <path d="M46 95 L56 125 L50 152" />
-            {/* Back Leg */}
-            <path d="M46 95 L40 125 L44 152" strokeDasharray="3 3" />
-            {/* Arm Side Bend */}
-            <path d="M48 42 L58 60 L48 78" />
-            {/* Knee Landmark Highlight */}
-            <circle cx="56" cy="125" r="5" fill="#fff100" stroke="#000000" strokeWidth="2" />
-          </svg>
-
-          {/* Corner Markers */}
-          <div className="absolute top-2 left-2 size-4 border-t-4 border-l-4 border-[#d1ffca]" />
-          <div className="absolute top-2 right-2 size-4 border-t-4 border-r-4 border-[#d1ffca]" />
-          <div className="absolute bottom-2 left-2 size-4 border-b-4 border-l-4 border-[#d1ffca]" />
-          <div className="absolute bottom-2 right-2 size-4 border-b-4 border-r-4 border-[#d1ffca]" />
-        </div>
+        {/* Bounding Box / Side-Profile Body Silhouette Component */}
+        <SilhouetteGuide />
 
         {/* Status Pill Badge */}
         <Badge className="bg-[#d1ffca] text-[#000000] hover:bg-[#d1ffca] font-mono text-xs px-4 py-1.5 rounded-full font-bold uppercase tracking-wider border-none shadow-lg flex items-center gap-1.5">
@@ -200,7 +146,7 @@ export default function Calibration() {
             <AudioLines className="size-6 animate-pulse" />
           </div>
           <p className="text-sm sm:text-base font-bold leading-snug text-[#000000]">
-            &ldquo;Posisikan smartphone sejajar lutut Anda pada jarak 1.5 – 2 meter&rdquo;
+            &ldquo;{AUDIO_PHRASES.CALIBRATION.DISTANCE_INSTRUCTION}&rdquo;
           </p>
         </Card>
 
@@ -213,6 +159,6 @@ export default function Calibration() {
           MULAI LATIHAN SEKARANG
         </Button>
       </footer>
-    </div>
-  )
+    </AppLayout>
+  );
 }
