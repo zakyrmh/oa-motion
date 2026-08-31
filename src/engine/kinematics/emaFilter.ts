@@ -9,7 +9,7 @@ export class EMAFilter {
   private alpha: number;
   private currentValue: number | null = null;
 
-  constructor(alpha: number = 0.3) {
+  constructor(alpha: number = 0.25) {
     this.alpha = Math.max(0.01, Math.min(1.0, alpha));
   }
 

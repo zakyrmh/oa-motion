@@ -1,4 +1,5 @@
 import type { Point2D, Point3D } from '@/types/kinematics';
+import { updateLegMeasurements, estimateKneePosition } from './occlusionHeuristics';
 
 /**
  * Calculates the interior angle (in degrees) formed by three 2D points (P1 - P2 - P3)
@@ -55,19 +56,38 @@ export function calculateJointAngle3D(p1: Point3D, p2: Point3D, p3: Point3D): nu
 /**
  * Convenience helper specifically for Knee Flexion Angle (Hip - Knee - Ankle).
  * Calculates the flexion angle: 180 - theta, representing how much the knee is bent from straight (0°).
- * Validates that all joints have a visibility score of at least 0.60.
+ * Validates that all joints have a visibility score of at least 0.60, or estimates the knee position
+ * in case of clothing occlusion using previously calibrated leg segment lengths.
  */
-export function calculateKneeAngle(hip: Point2D, knee: Point2D, ankle: Point2D): number {
-  // Validasi keypoint visibility minimal 0.60
+export function calculateKneeAngle(
+  hip: Point2D,
+  knee: Point2D,
+  ankle: Point2D,
+  side: 'left' | 'right' = 'left'
+): number {
+  // Validasi visibilitas dasar untuk Hip dan Ankle
   if (
     (hip.visibility !== undefined && hip.visibility < 0.60) ||
-    (knee.visibility !== undefined && knee.visibility < 0.60) ||
     (ankle.visibility !== undefined && ankle.visibility < 0.60)
   ) {
     return 0.0;
   }
 
-  const interiorAngle = calculateJointAngle2D(hip, knee, ankle);
+  let activeKnee = knee;
+
+  // Penanganan Oklusi: Jika visibilitas lutut rendah, coba estimasikan posisinya
+  if (knee.visibility !== undefined && knee.visibility < 0.60) {
+    const estimated = estimateKneePosition(hip, ankle, side);
+    if (!estimated) {
+      return 0.0; // Gagal estimasi karena tidak ada data historis valid sebelumnya
+    }
+    activeKnee = estimated;
+  } else {
+    // Jika semua sendi valid, perbarui data kalibrasi panjang kaki untuk oklusi di masa depan
+    updateLegMeasurements(hip, knee, ankle, side);
+  }
+
+  const interiorAngle = calculateJointAngle2D(hip, activeKnee, ankle);
   
   // Normalisasi sudut fleksi: Flexion Angle = 180 - interiorAngle
   const flexionAngle = 180 - interiorAngle;
