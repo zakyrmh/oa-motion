@@ -53,8 +53,28 @@ export function calculateJointAngle3D(p1: Point3D, p2: Point3D, p3: Point3D): nu
 }
 
 /**
- * Convenience helper specifically for Knee Flexion Angle (Hip - Knee - Ankle)
+ * Convenience helper specifically for Knee Flexion Angle (Hip - Knee - Ankle).
+ * Calculates the flexion angle: 180 - theta, representing how much the knee is bent from straight (0°).
+ * Validates that all joints have a visibility score of at least 0.60.
  */
 export function calculateKneeAngle(hip: Point2D, knee: Point2D, ankle: Point2D): number {
-  return calculateJointAngle2D(hip, knee, ankle);
+  // Validasi keypoint visibility minimal 0.60
+  if (
+    (hip.visibility !== undefined && hip.visibility < 0.60) ||
+    (knee.visibility !== undefined && knee.visibility < 0.60) ||
+    (ankle.visibility !== undefined && ankle.visibility < 0.60)
+  ) {
+    return 0.0;
+  }
+
+  const interiorAngle = calculateJointAngle2D(hip, knee, ankle);
+  
+  // Normalisasi sudut fleksi: Flexion Angle = 180 - interiorAngle
+  const flexionAngle = 180 - interiorAngle;
+
+  // Pastikan output dalam rentang 0 sampai 180
+  const normalized = Math.max(0.0, Math.min(180.0, flexionAngle));
+
+  // Bulatkan ke satu desimal
+  return Math.round(normalized * 10) / 10;
 }
