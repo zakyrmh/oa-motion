@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added keypoint visibility safety verification (minimum 0.60 threshold) in `calculateKneeAngle` (T-006).
 - Updated default `EMAFilter` alpha parameter value to `0.25` for improved real-time tracking smoothness (T-007).
 - Added geometric reconstruction and tracking fallback (`occlusionHeuristics.ts`) to estimate the knee position when occluded by loose clothing (T-007).
+- Added `SafetyZone` type and `ZoneThresholds` interface in `src/types/clinical.ts` (T-008).
+- Added `rulesEngine.ts` module with functions to dynamically calculate safety zones (GREEN, YELLOW, RED) and exercise phases (REST, FLEXION, HOLD, EXTENSION, OVER_FLEXION) based on OA grade limits (T-008).
 - Added automatic real-time Text-to-Speech (TTS) Web Speech API integration in Indonesian (`id-ID`) on `/calibration` synchronized with mute/unmute toggle.
 - Added data persistence via `localStorage` and React Router state forwarding across Home (`/`), Calibration (`/calibration`), and Tracking (`/tracking`) pages.
 - Added AR camera calibration guide screen on `/calibration` featuring camera feed preview, side-profile body silhouette overlay, distance badge, audio instruction card, and status pill.

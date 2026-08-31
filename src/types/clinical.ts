@@ -20,3 +20,11 @@ export interface ClinicalSafetyLimits {
   dailyRepetitionTarget: number; // e.g. 10 reps
   description: string;
 }
+
+export type SafetyZone = 'GREEN' | 'YELLOW' | 'RED';
+
+export interface ZoneThresholds {
+  greenMax: number;   // Batas atas zona hijau (misal 80)
+  yellowMax: number;  // Batas atas zona kuning (misal 90)
+  redMin: number;     // Batas bawah zona merah (sama dengan yellowMax)
+}
