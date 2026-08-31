@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added MediaPipe Pose WASM integration using `@mediapipe/tasks-vision` for 33 body landmark tracking (T-005).
+- Added `usePoseTracking` custom React hook to manage WebRTC webcam frame processing loop using `requestAnimationFrame`.
 - Added automatic real-time Text-to-Speech (TTS) Web Speech API integration in Indonesian (`id-ID`) on `/calibration` synchronized with mute/unmute toggle.
 - Added data persistence via `localStorage` and React Router state forwarding across Home (`/`), Calibration (`/calibration`), and Tracking (`/tracking`) pages.
 - Added AR camera calibration guide screen on `/calibration` featuring camera feed preview, side-profile body silhouette overlay, distance badge, audio instruction card, and status pill.

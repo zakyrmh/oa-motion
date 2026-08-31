@@ -67,7 +67,7 @@ Dokumen ini memecah kebutuhan produk dari `PRD.md` menjadi unit-unit tugas tekni
 
 | ID | Tugas | Deskripsi | Prioritas | Dependency | Status | PIC |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **T-005** | Integrasi `@mediapipe/pose` WASM | Setup pipeline deteksi 33 landmark tubuh via browser webcam di memori RAM lokal. | P0 | T-001 | 🔴 | Naufal Khalil Aldeza |
+| **T-005** | Integrasi `@mediapipe/pose` WASM | Setup pipeline deteksi 33 landmark tubuh via browser webcam di memori RAM lokal. | P0 | T-001 | 🟢 | Naufal Khalil Aldeza |
 | **T-006** | Engine Biomekanika `angleCalculator.ts` | Kalkulasi sudut fleksi lutut ($\theta$) berbasis Aturan Kosinus (vektor Hip-Knee-Ankle). | P0 | T-005 | 🔴 | Naufal Khalil Aldeza |
 | **T-007** | Filter Smoothing & Heuristic Tracking | Implementasi Exponential Moving Average (`EMAFilter`, $\alpha=0.25$) dan penanganan oklusi pakaian longgar. | P0 | T-006 | 🔴 | Naufal Khalil Aldeza |
 | **T-008** | Adaptive Rules Engine & Safe RoM | Pemetaan dinamis batas sudut zona Hijau, Kuning, Merah berdasarkan input Grade OA. | P0 | T-004, T-006 | 🔴 | Naufal Khalil Aldeza |
