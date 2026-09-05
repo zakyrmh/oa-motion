@@ -1,11 +1,29 @@
-import type { ClinicalSafetyLimits, OAGrade, PainBadgeConfig } from '@/types/clinical';
+import type { ClinicalSafetyLimits, OAGrade, PainBadgeConfig, TargetKnee } from '@/types/clinical';
 
 export const DEFAULT_MEDICAL_PROFILE = {
   oaGrade: 'grade2' as OAGrade,
   painScale: 4,
   hasKneeSurgery: false,
-  targetKnee: 'left' as const,
+  targetKnee: 'left' as TargetKnee,
 };
+
+export const TARGET_KNEE_OPTIONS = [
+  {
+    id: 'left' as TargetKnee,
+    title: 'LUTUT KIRI',
+    desc: 'Fokus kaki kiri',
+  },
+  {
+    id: 'right' as TargetKnee,
+    title: 'LUTUT KANAN',
+    desc: 'Fokus kaki kanan',
+  },
+  {
+    id: 'both' as TargetKnee,
+    title: 'KEDUA LUTUT',
+    desc: 'Latihan bilateral',
+  },
+] as const;
 
 export const OA_GRADE_OPTIONS = [
   {

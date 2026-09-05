@@ -11,7 +11,7 @@ export function AppLayout({ children, className, variant = 'light' }: AppLayoutP
   return (
     <div
       className={cn(
-        'min-h-screen flex flex-col justify-between max-w-md mx-auto font-sans transition-colors duration-200',
+        'min-h-screen flex flex-col justify-between w-full max-w-md md:max-w-2xl lg:max-w-3xl mx-auto font-sans transition-colors duration-200',
         variant === 'light' ? 'bg-[#e5e5e5] text-[#000000]' : 'bg-[#000000] text-[#ffffff]',
         className
       )}

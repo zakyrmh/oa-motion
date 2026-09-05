@@ -1,6 +1,6 @@
 # AGENTS.md — AI Coding Agent Guide for OA-Motion
 
-> **Petunjuk AI Agent:** Dokumen ini adalah acuan operasional dan arsitektur wajib bagi seluruh AI Coding Agent (Antigravity, Cursor, Claude Code, GitHub Copilot) yang bekerja di repositori **OA-Motion**. Patuhi seluruh konvensi kode, struktur folder, dan batasan teknis di bawah ini.
+> **Petunjuk AI Agent:** Dokumen ini adalah acuan operasional dan arsitektur wajib bagi seluruh AI Coding Agent (Antigravity CLI `agy`, Cursor, Claude Code, GitHub Copilot) yang bekerja di repositori **OA-Motion**. Patuhi seluruh konvensi kode, struktur folder, batasan teknis, dan protokol memori Obsidian di bawah ini.
 
 ---
 
@@ -22,7 +22,7 @@ Proyek ini dikembangkan oleh **Tim SPEKTRA (Politeknik Negeri Padang)** untuk ko
 | **Routing** | [React Router DOM](https://reactrouter.com/) v7 | SPA Routing dengan Lazy Loading & Suspense |
 | **Styling & Design System** | [Tailwind CSS](https://tailwindcss.com/) v4 & [shadcn/ui](https://ui.shadcn.com/) | Editorial Brutalist monochrome theme with mint/yellow accents |
 | **Icons** | [Lucide React](https://lucide.dev/) | Consistent stroke icons |
-| **Computer Vision Engine** | [MediaPipe Pose](https://developers.google.com/mediapipe) / Edge AI | 33 Pose Landmarks, Cosine Law trigonometry, EMA filter |
+| **Computer Vision Engine** | [MediaPipe Tasks Vision](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker) (`@mediapipe/tasks-vision`, `PoseLandmarker`) / Edge AI | 33 Pose Landmarks, Cosine Law trigonometry, EMA filter |
 | **Audio & Voice Engine** | Web Speech API & Web Audio API | Zero-dependency Indonesian voice coach & tone synthesizer |
 | **Git Hooks & Quality** | Husky, Commitlint, Lint-staged, Commitizen | Conventional Commits standard |
 
@@ -104,6 +104,7 @@ oa-motion/
 ├── package.json                 # Dependency & scripts
 ├── tsconfig.app.json            # Strict TypeScript configuration
 └── vite.config.ts               # Vite configuration
+
 ```
 
 ---
@@ -111,7 +112,7 @@ oa-motion/
 ## 4. Perintah Penting (Setup & Commands)
 
 | Perintah | Deskripsi |
-|---|---|
+| --- | --- |
 | `npm run dev` | Menjalankan local development server (Vite HMR) |
 | `npm run build` | Menjalankan validasi TypeScript (`tsc -b`) dan build produksi Vite |
 | `npm run lint` | Menjalankan ESLint pada seluruh codebase |
@@ -123,65 +124,140 @@ oa-motion/
 ## 5. Konvensi Kode (Coding Conventions)
 
 ### 5.1 TypeScript & Modul
-- **Type-Only Imports:** Proyek ini mengaktifkan `verbatimModuleSyntax`. Wajib gunakan sintaks `import type { ... } from '...'` untuk interface dan tipe data murni.
-- **Strict Typing:** Dilarang menggunakan tipe `any`. Gunakan tipe eksplisit dari `src/types/`.
-- **Path Aliases:** Selalu gunakan alias `@/` untuk import internal (misal: `@/components/ui/button`, `@/engine/kinematics`, `@/types/clinical`).
+
+* **Type-Only Imports:** Proyek ini mengaktifkan `verbatimModuleSyntax`. Wajib gunakan sintaks `import type { ... } from '...'` untuk interface dan tipe data murni.
+* **Strict Typing:** Dilarang menggunakan tipe `any`. Gunakan tipe eksplisit dari `src/types/`.
+* **Path Aliases:** Selalu gunakan alias `@/` untuk import internal (misal: `@/components/ui/button`, `@/engine/kinematics`, `@/types/clinical`).
 
 ### 5.2 React 19 & Vercel Best Practices
-- **Functional Components:** Semua komponen wajib berbasis fungsi dengan TypeScript.
-- **Hindari Fat Components:** Pisahkan logika matematika berat ke `src/engine/` dan logika stateful reusable ke `src/hooks/`.
-- **Fast Refresh Compliance:** Jangan mengekspor fungsi biasa / non-komponen bersamaan dengan komponen React di file `.tsx` yang sama.
-- **Effect Discipline:** Hindari pemanggilan `setState` sinkron langsung di awal `useEffect` untuk mencegah *cascading render*.
-- **Hardware Cleanup:** Pastikan setiap *media stream* kamera (`MediaStreamTrack.stop()`) dan audio context selalu dibersihkan di *cleanup callback* `useEffect`.
+
+* **Functional Components:** Semua komponen wajib berbasis fungsi dengan TypeScript.
+* **Hindari Fat Components:** Pisahkan logika matematika berat ke `src/engine/` dan logika stateful reusable ke `src/hooks/`.
+* **Fast Refresh Compliance:** Jangan mengekspor fungsi biasa / non-komponen bersamaan dengan komponen React di file `.tsx` yang sama.
+* **Effect Discipline:** Hindari pemanggilan `setState` sinkron langsung di awal `useEffect` untuk mencegah *cascading render*.
+* **Hardware Cleanup:** Pastikan setiap *media stream* kamera (`MediaStreamTrack.stop()`) dan audio context selalu dibersihkan di *cleanup callback* `useEffect`.
 
 ### 5.3 Desain & Styling
-- **Tokens Keselarasan:** Ikuti aturan warna brutalist di `docs/DESIGN.md`:
-  - Canvas: `#e5e5e5` (Light mode) / `#000000` (Dark/Tracking mode)
-  - Accent Tag / Safe: Mint Green (`#d1ffca`)
-  - Warning / Highlight: Voltage Yellow (`#fff100`)
-  - Primary Action / Text: Carbon Black (`#000000`) & Paper White (`#ffffff`)
-- Gunakan utility function `cn()` dari `@/lib/utils` untuk penggabungan class Tailwind kondisional.
+
+* **Tokens Keselarasan:** Ikuti aturan warna brutalist di `docs/DESIGN.md`:
+* Canvas: `#e5e5e5` (Light mode) / `#000000` (Dark/Tracking mode)
+* Accent Tag / Safe: Mint Green (`#d1ffca`)
+* Warning / Highlight: Voltage Yellow (`#fff100`)
+* Primary Action / Text: Carbon Black (`#000000`) & Paper White (`#ffffff`)
+
+
+* Gunakan utility function `cn()` dari `@/lib/utils` untuk penggabungan class Tailwind kondisional.
 
 ---
 
-## 6. Aturan Operasional AI Agent (DOs & DON'Ts)
+## 6. Integrasi Memori Jangka Panjang (Obsidian Vault & Antigravity)
+
+Untuk mempertahankan *context awareness* lintas sesi terminal, AI Agent diinstruksikan untuk menggunakan **Obsidian Vault** sebagai media penyimpanan memori jangka panjang (*Long-term Memory*).
+
+### 6.1 Lokasi Direktori Vault
+
+* **Path Utama (Absolute):** `~/Documents/Antigravity_Brain/`
+* **Sub-folder Memori:** `~/Documents/Antigravity_Brain/02_Agent_Memory/`
+* **Sub-folder Referensi/Knowledge:** `~/Documents/Antigravity_Brain/01_Knowledge/`
+*(Catatan: Jika terdapat symlink `./.brain/` di root proyek, agen diizinkan membaca/menulis langsung melalui `./.brain/`)*.
+
+### 6.2 Protokol Membaca Memori (Read Protocol)
+
+Sebelum mengerjakan tugas yang melibatkan:
+
+1. Refactoring arsitektur atau state global (`MedicalProfileContext`).
+2. Debugging masalah hardware (WebRTC camera stream, Web Audio API, MediaPipe pose detection).
+3. Modifikasi rumus kinematika atau batasan klinis OA.
+
+**AI Agent WAJIB memeriksa catatan terdahulu** di `~/Documents/Antigravity_Brain/02_Agent_Memory/` untuk melihat apakah ada keputusan teknis, gotchas, atau solusi bug serupa yang pernah dicatat sebelumnya.
+
+### 6.3 Protokol Menulis Memori (Write Protocol)
+
+AI Agent **WAJIB membuat catatan baru** ketika:
+
+1. Menemukan dan menyelesaikan *subtle bug* atau *quirk* khusus browser (misal: autoplay audio policy, mobile camera orientation).
+2. Mengambil keputusan arsitektur baru (*Architectural Decision Record* / ADR).
+3. Menyelesaikan optimasi performa komputasi atau bundler.
+
+#### Format Standar File Memori:
+
+* **Lokasi Simpan:** `~/Documents/Antigravity_Brain/02_Agent_Memory/oa-motion-<kategori>-<topik-singkat>.md`
+* **Struktur Markdown & YAML Frontmatter:**
+
+```markdown
+---
+title: "Deskripsi Singkat Solusi / Keputusan"
+project: "oa-motion"
+date: YYYY-MM-DD
+type: "bugfix" # Pilihan: bugfix | adr | gotcha | optimization
+tags:
+  - oa-motion
+  - kinematics # sesuaikan topik (misal: webrtc, audio, react19, styling)
+  - agent-memory
+---
+
+## 1. Konteks Masalah / Latar Belakang
+Penjelasan ringkas tentang kendala yang dihadapi atau keputusan yang perlu dibuat.
+
+## 2. Analisis Akar Masalah (Root Cause)
+Mengapa masalah tersebut terjadi atau alasan pemilihan pendekatan tertentu.
+
+## 3. Solusi Teknis & Implementasi
+Rincian perubahan kode, file yang terpengaruh, atau snippet penting.
+
+## 4. Pelajaran Penting (Gotchas untuk Sesi Mendatang)
+Poin penting yang harus diingat agen di sesi berikutnya agar tidak mengulangi kesalahan yang sama.
+
+```
+
+---
+
+## 7. Aturan Operasional AI Agent (DOs & DON'Ts)
 
 ### ✅ Wajib Dilakukan (DOs)
-1. **Verifikasi Build Mandiri:** Selalu jalankan `npm run lint` dan `npm run build` setelah melakukan modifikasi file sebelum melaporkan hasil ke pengguna.
-2. **Pertahankan Tipe Data Terpusat:** Setiap tipe entitas baru harus didefinisikan di `src/types/` dan diekspor melalui `src/types/index.ts`.
-3. **Pure Functions untuk Kinematika:** Logika perhitungan sudut fleksi, filter EMA, dan threshold keselamatan klinis harus berupa *pure functions* tanpa dependensi DOM/React.
-4. **Resistensi Terhadap State Loss:** Selalu manfaatkan `MedicalProfileContext` atau `localStorage` terverifikasi agar data profil pasien tidak hilang saat refresh browser.
+
+1. **Periksa Memori Obsidian:** Cek `~/Documents/Antigravity_Brain/02_Agent_Memory/` sebelum mulai mengerjakan masalah rumit atau ambigu.
+2. **Catat Solusi Penting:** Tulis log pemecahan masalah ke folder memori Obsidian setelah menyelesaikan bug non-trivial atau keputusan arsitektur.
+3. **Verifikasi Build Mandiri:** Selalu jalankan `npm run lint` dan `npm run build` setelah melakukan modifikasi file sebelum melaporkan hasil ke pengguna.
+4. **Pertahankan Tipe Data Terpusat:** Setiap tipe entitas baru harus didefinisikan di `src/types/` dan diekspor melalui `src/types/index.ts`.
+5. **Pure Functions untuk Kinematika:** Logika perhitungan sudut fleksi, filter EMA, dan threshold keselamatan klinis harus berupa *pure functions* tanpa dependensi DOM/React.
+6. **Resistensi Terhadap State Loss:** Selalu manfaatkan `MedicalProfileContext` atau `localStorage` terverifikasi agar data profil pasien tidak hilang saat refresh browser.
 
 ### ❌ Dilarang Keras (DON'Ts)
+
 1. **Dilarang memasukkan rumus matematika langsung di dalam JSX komponen.**
 2. **Dilarang menggunakan `location.state` sebagai satu-satunya sumber kebenaran data medis** (harus selalu ada fallback ke Context / LocalStorage).
 3. **Dilarang menginstal dependensi npm baru tanpa pertimbangan ukuran bundle.**
 4. **Dilarang mematikan atau mengabaikan konfigurasi ESLint dan TypeScript strict mode.**
+5. **Dilarang menyimpan file memori sembarangan di luar struktur direktori Obsidian yang telah ditentukan.**
+6. **Dilarang menampilkan klaim akurasi angka pasti (misal: "Akurat hingga ±5°") di UI aplikasi sebelum pengujian klinis formal selesai.**
 
 ---
 
-## 7. Integrasi Agent Skills
+## 8. Integrasi Agent Skills
 
 Proyek ini telah dilengkapi dengan *Agent Skills* lokal di folder `.agents/skills/`:
-- **`shadcn` (`.agents/skills/shadcn`):** Panduan instalasi, kustomisasi, komposisi UI, dan integrasi komponen Base UI / Radix.
-- **`vercel-react-best-practices` (`.agents/skills/vercel-react-best-practices`):** Panduan optimasi performa React 19, pencegahan *re-render*, manajemen *event listener*, dan efisiensi *client-side bundle*.
+
+* **`shadcn` (`.agents/skills/shadcn`):** Panduan instalasi, kustomisasi, komposisi UI, dan integrasi komponen Base UI / Radix.
+* **`vercel-react-best-practices` (`.agents/skills/vercel-react-best-practices`):** Panduan optimasi performa React 19, pencegahan *re-render*, manajemen *event listener*, dan efisiensi *client-side bundle*.
 
 ---
 
-## 8. Dokumen Referensi Utama
+## 9. Dokumen Referensi Utama
 
-- **[PRD.md](./PRD.md):** Spesifikasi fungsional, latar belakang klinis OA Grade 1–3, dan metrik keberhasilan Samsung Solve for Tomorrow 2026.
-- **[DESIGN.md](./DESIGN.md):** Spesifikasi visual Brutalist Editorial, skala tipografi, dan token palet warna.
-- **[TASKS.md](./TASKS.md):** Daftar tugas teknis terinci per fase (Fase 1 hingga Fase 5) dengan status prioritas (P0–P2).
+* **[OA-Motion_Dev_Guide.md](docs/OA-Motion_Dev_Guide.md):** Rujukan teknis final dan batasan ruang lingkup purwarupa MVP untuk demonstrasi Samsung Solve for Tomorrow 2026.
+* **[PRD.md](docs/PRD.md):** Spesifikasi fungsional, latar belakang klinis OA Grade 1–3, dan metrik keberhasilan Samsung Solve for Tomorrow 2026.
+* **[DESIGN.md](docs/DESIGN.md):** Spesifikasi visual Brutalist Editorial, skala tipografi, dan token palet warna.
+* **[TASKS.md](docs/TASKS.md):** Daftar tugas teknis terinci per fase (Fase 1 hingga Fase 5) dengan status prioritas (P0–P2).
 
 ---
 
-## 9. Catatan Khusus & Gotchas
+## 10. Catatan Khusus & Gotchas
 
 1. **Web Speech API di Mobile Browser:** Beberapa browser mobile memerlukan interaksi pengguna pertama (*user gesture*) sebelum audio dapat diputar otomatis.
 2. **MediaPipe Coordinate System:** Koordinat landmark MediaPipe berada dalam rentang ternormalisasi $0.0 - 1.0$. Sumbu Y bernilai $0.0$ di bagian atas layar dan $1.0$ di bagian bawah.
 3. **Aturan Kosinus Fleksi Lutut:** Sudut fleksi lutut dihitung pada titik sendi lutut ($P_2$) antara pinggul ($P_1$) dan pergelangan kaki ($P_3$). Posisi kaki lurus sempurna bernilai $\approx 180^\circ$, sedangkan posisi lutut ditekuk $90^\circ$ bernilai $\approx 90^\circ$.
 4. **Batas Fleksi Aman per Grade OA:**
-   - **Grade 1 (Ringan):** Fleksi maksimal aman hingga $100^\circ$.
-   - **Grade 2 (Sedang):** Fleksi maksimal aman hingga $90^\circ$.
-   - **Grade 3 (Berat):** Fleksi maksimal aman dibatasi pada $75^\circ$ untuk mencegah stres kompresif sendi tibiofemoral berlebih.
+* **Grade 1 (Ringan):** Fleksi maksimal aman hingga $100^\circ$.
+* **Grade 2 (Sedang):** Fleksi maksimal aman hingga $90^\circ$.
+* **Grade 3 (Berat):** Fleksi maksimal aman dibatasi pada $75^\circ$ untuk mencegah stres kompresif sendi tibiofemoral berlebih.

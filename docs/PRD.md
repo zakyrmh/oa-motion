@@ -17,9 +17,9 @@
 
 ## 2. Ringkasan Eksekutif
 
-**OA-Motion** adalah aplikasi web kesehatan berbasis *Edge AI* dan *Computer Vision* yang menyediakan panduan latihan fisik mandiri secara adaptif, aman, dan *real-time* bagi penderita Osteoarthritis (OA) lutut (Grade 1–3) serta pasien rehabilitasi pasca-operasi. Sistem memanfaatkan kamera bawaan smartphone atau laptop tanpa memerlukan sensor atau *wearable device* tambahan (*zero hardware barrier*).
+**OA-Motion** adalah aplikasi web kesehatan berbasis *Edge AI* dan *Computer Vision* yang menyediakan panduan latihan fisik mandiri (berfokus pada gerakan **Squat adaptif**) secara preventif, aman, dan *real-time* bagi penderita Osteoarthritis (OA) lutut (Grade 1–3) serta pasien rehabilitasi pasca-operasi. Aplikasi ini **secara eksplisit tidak ditujukan untuk penderita OA Grade 4**, yang memerlukan pengawasan klinis langsung. Sistem memanfaatkan kamera bawaan smartphone atau laptop tanpa memerlukan sensor atau *wearable device* tambahan (*zero hardware barrier*).
 
-Melalui integrasi MediaPipe Pose dan aturan trigonometri kosinus, OA-Motion bertindak sebagai **"Digital Spotter"** yang menyesuaikan batas aman gerakan (*Range of Motion* / RoM) berdasarkan profil klinis individu, memberikan peringatan visual dan suara Bahasa Indonesia sebelum risiko cedera terjadi, serta mencatat data sesi untuk laporan telerehabilitasi ke fisioterapis. Proyek ini dikembangkan oleh Tim SPEKTRA (Politeknik Negeri Padang) untuk kompetisi **Samsung Solve for Tomorrow (SFT) 2026** di bawah tema *Sport & Technology* guna mendukung pencapaian SDGs 1, 3, dan 10.
+Melalui integrasi MediaPipe Tasks Vision (`PoseLandmarker`) dan aturan trigonometri kosinus, OA-Motion bertindak sebagai **"Digital Spotter"** yang menyesuaikan batas aman gerakan (*Range of Motion* / RoM) secara adaptif berdasarkan profil klinis individu, memberikan peringatan visual dan suara Bahasa Indonesia sebelum risiko cedera terjadi (*preventive feedback*), serta mencatat ringkasan sesi latihan telerehabilitasi. Proyek ini dikembangkan oleh Tim SPEKTRA (Politeknik Negeri Padang) untuk kompetisi **Samsung Solve for Tomorrow (SFT) 2026** di bawah tema *Sport & Technology* guna mendukung pencapaian SDGs 1, 3, dan 10.
 
 ---
 
@@ -75,19 +75,20 @@ Aktivitas fisik terstruktur merupakan terapi non-farmakologis paling efektif unt
 
 ## 6. Ruang Lingkup (Scope)
 
-### 6.1 Termasuk dalam Cakupan (In Scope)
-- **Formulir Profil Medis Dinamis:** Pengaturan Grade OA (1–3), slider skala nyeri harian (VAS 1–10), dan riwayat operasi lutut.
+### 6.1 Termasuk dalam Cakupan (In Scope — MVP Release SFT 2026)
+- **Formulir Profil Medis Dinamis & Disclaimer:** Pengaturan Grade OA (1–3), pilihan sisi lutut (kiri/kanan/keduanya), slider skala nyeri harian (VAS 1–10), riwayat operasi lutut, dan *Medical Disclaimer* eksplisit.
 - **Pemandu Kalibrasi Kamera Visual & Audio:** Validasi jarak (1,5–2 meter), garis siluet tubuh tampak samping (*lateral plane*), dan instruksi suara kalibrasi.
-- **Kinematic Engine (Edge AI):** Ekstraksi landmark tubuh MediaPipe Pose, perhitungan sudut kosinus, dan penghalusan sudut (*EMA smoothing*).
-- **Umpan Balik Preventif 3 Zona:** Status banner warna (Hijau, Kuning, Merah) dan sintesis suara otomatis Bahasa Indonesia via Web Speech API.
-- **Dashboard Ringkasan & Ekspor PDF:** Kartu metrik durasi, rata-rata RoM, skor kepatuhan, grafik garis repetisi, serta generator PDF laporan fisioterapi.
+- **Kinematic Engine (Edge AI — Gerakan Squat Inti):** Ekstraksi 33 landmark tubuh via MediaPipe Tasks Vision (`PoseLandmarker`), perhitungan sudut Aturan Kosinus (Hip-Knee-Ankle), dan penghalusan sudut (*EMA smoothing*).
+- **Umpan Balik Preventif 3 Zona:** Status banner warna (Hijau, Kuning, Merah) dengan *adaptive thresholding* per Grade OA dan sintesis suara otomatis Bahasa Indonesia via Web Speech API.
+- **Dashboard Ringkasan & Ekspor Snapshot Sesi:** Kartu metrik durasi, rata-rata RoM, jumlah peringatan zona merah, persentase repetisi aman, serta generator ekspor/unduh PDF ringkasan sesi.
 - **Arsitektur Zero Video Transmission:** Pemrosesan frame kamera murni di RAM perangkat klien tanpa pengiriman data video ke luar.
 
 ### 6.2 Tidak Termasuk dalam Cakupan (Out of Scope — Rencana Fase Lanjutan)
-- Sistem pembayaran daring (*payment gateway*) untuk paket langganan klinik berbayar.
-- Integrasi langsung dua arah ke database Rekam Medis Elektronik (EHR) rumah sakit mitra.
-- Pelacakan untuk sendi non-lutut (misalnya rehabilitasi bahu, leher, atau skoliosis punggung).
-- Integrasi dengan sensor perangkat keras fisik tambahan (*wearable sensors/IMU*).
+- **Penderita OA Grade 4:** Kondisi sendi berat/tulang bergesekan langsung yang mutlak memerlukan pendampingan fisik tenaga medis di klinik.
+- **Sistem Pembayaran & Akun Multi-user Kompleks:** Tidak diperlukan untuk purwarupa demo kompetisi.
+- **Integrasi Dua Arah Rekam Medis Elektronik (EHR):** Cukup format dokumen PDF portabel untuk demonstrasi.
+- **Pelacakan Sendi Non-Lutut:** Fokus penuh pada sendi lutut dan biomekanika squat.
+- **Sensor Hardware Tambahan (Wearable/IMU):** Mempertahankan prinsip *Zero Hardware Barrier*.
 
 ---
 
@@ -95,17 +96,18 @@ Aktivitas fisik terstruktur merupakan terapi non-farmakologis paling efektif unt
 
 | ID | Nama Fitur | Deskripsi | Prioritas (MoSCoW) |
 | :--- | :--- | :--- | :--- |
-| **FR-01** | Pengaturan Profil Klinis | Pengguna dapat memilih Grade OA (1/2/3), mengisi skala nyeri VAS (1–10), dan status operasi. | **Must Have** |
-| **FR-02** | *Adaptive Threshold Locking* | Sistem secara otomatis mengunci ambang batas sudut Zona Kuning dan Merah berdasarkan Grade OA yang dipilih. | **Must Have** |
-| **FR-03** | Kalibrasi Kamera AR & Suara | Menampilkan siluet *bounding box* dan membacakan instruksi penempatan kamera pada jarak 1,5–2 meter. | **Must Have** |
-| **FR-04** | Deteksi Landmark MediaPipe | Mengidentifikasi koordinat titik panggul, lutut, dan pergelangan kaki dari kamera secara *real-time*. | **Must Have** |
-| **FR-05** | Kalkulasi Sudut Trigonometri | Menghitung sudut fleksi lutut secara otomatis pada setiap frame menggunakan aturan kosinus. | **Must Have** |
-| **FR-06** | Indikator Visual 3 Zona | Mengubah warna banner atas (Hijau/Kuning/Merah) sesuai posisi sudut aktif. | **Must Have** |
-| **FR-07** | *Preventive Voice Alerts* | Membunyikan suara Bahasa Indonesia saat gerakan pengguna memasuki Zona Kuning/Merah dengan *audio debounce*. | **Must Have** |
-| **FR-08** | Tombol Darurat (Emergency Stop) | Pengguna dapat menghentikan sesi seketika melalui tombol besar yang selalu terlihat. | **Must Have** |
-| **FR-09** | Ringkasan Sesi & Grafik RoM | Menampilkan metrik durasi, rata-rata sudut, jumlah peringatan, dan visualisasi grafik repetisi. | **Should Have** |
-| **FR-10** | Generator Unduh PDF | Menghasilkan dokumen rekapitulasi latihan terstruktur untuk dibagikan ke fisioterapis. | **Should Have** |
+| **FR-01** | Pengaturan Profil Klinis | Pengguna dapat memilih Grade OA (1/2/3), target lutut (kiri/kanan/keduanya), skala nyeri VAS (1–10), dan status operasi. | **Must Have** |
+| **FR-02** | *Adaptive Threshold Locking* | Sistem mengunci ambang batas sudut fleksi squat (Zona Hijau/Kuning/Merah) dinamis berdasarkan Grade OA `[BUTUH VALIDASI KLINIS]`. | **Must Have** |
+| **FR-03** | Kalibrasi Kamera AR & Suara | Menampilkan siluet *bounding box* tampak samping dan instruksi penempatan kamera jarak 1,5–2 meter. | **Must Have** |
+| **FR-04** | Deteksi Landmark MediaPipe | Mengidentifikasi koordinat titik panggul, lutut, dan pergelangan kaki dari kamera secara *real-time* on-device. | **Must Have** |
+| **FR-05** | Kalkulasi Sudut Trigonometri | Menghitung sudut tekukan fleksi lutut secara otomatis pada setiap frame menggunakan aturan kosinus. | **Must Have** |
+| **FR-06** | Indikator Visual 3 Zona | Mengubah warna banner atas (Hijau/Kuning/Merah) secara live sesuai posisi kedalaman squat aktif. | **Must Have** |
+| **FR-07** | *Preventive Voice Alerts* | Membunyikan suara Bahasa Indonesia saat gerakan pengguna mendekati batas waspada (Zona Kuning/Merah) dengan *audio debounce*. | **Must Have** |
+| **FR-08** | Tombol Darurat (Emergency Stop) | Pengguna dapat menghentikan sesi seketika melalui tombol besar yang selalu terlihat di viewport. | **Must Have** |
+| **FR-09** | Ringkasan Sesi & Metrik RoM | Menampilkan metrik durasi latihan, rata-rata sudut fleksi, jumlah pengulangan aman, dan frekuensi peringatan bahaya. | **Must Have** |
+| **FR-10** | Generator Unduh Dokumen PDF | Menghasilkan ringkasan laporan sesi latihan telerehabilitasi terstruktur dalam format PDF. | **Should Have** |
 | **FR-11** | Kontrol Bisu Suara (*Mute Toggle*) | Pengguna dapat mematikan atau menyalakan suara instruksi kapan saja dari header. | **Could Have** |
+| **FR-12** | *Medical Disclaimer & Exclusion Notice* | Menampilkan pernyataan bahwa aplikasi adalah alat bantu latihan mandiri (bukan diagnostik) dan mengecualikan Grade 4. | **Must Have** |
 
 ---
 
@@ -176,7 +178,7 @@ Aktivitas fisik terstruktur merupakan terapi non-farmakologis paling efektif unt
 | **Arsitektur Sistem** | Single Page Application (SPA) — 100% Client-Side Edge AI Processing. |
 | **Framework & Build Tool** | Vite 6.x / 8.x + React 19 (TypeScript / TSX). |
 | **Styling Library** | Tailwind CSS 4.x + Lucide React Icons + shadcn/ui. |
-| **Machine Learning Engine** | Google MediaPipe Pose (`@mediapipe/pose` / Vision Tasks) berbasis WebAssembly (WASM). |
+| **Machine Learning Engine** | Google MediaPipe Tasks Vision (`@mediapipe/tasks-vision`, `PoseLandmarker`) berbasis WebAssembly (WASM). |
 | **Speech Engine** | Native W3C Web Speech API (`window.speechSynthesis`) dengan paket suara Bahasa Indonesia (`id-ID`). |
 | **Data Visualisasi & PDF** | Chart.js (`react-chartjs-2`) untuk grafik garis dan `jspdf` / `html2pdf.js` untuk ekspor dokumen. |
 | **Penyimpanan Data Sesi** | Browser `localStorage` / React Context State Memory (Mocked Telemetry). |

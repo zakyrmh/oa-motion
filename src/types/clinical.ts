@@ -1,10 +1,11 @@
 export type OAGrade = 'grade1' | 'grade2' | 'grade3';
+export type TargetKnee = 'left' | 'right' | 'both';
 
 export interface MedicalProfile {
   oaGrade: OAGrade;
   painScale: number; // 1 - 10 (VAS)
   hasKneeSurgery: boolean;
-  targetKnee: 'left' | 'right' | 'both';
+  targetKnee: TargetKnee;
 }
 
 export interface PainBadgeConfig {
