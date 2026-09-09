@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added SVG visual trend chart component `RoMChart.tsx` on `/summary` displaying repetition-by-repetition Range of Motion (RoM) knee flexion angle trend curve with clinical safe limit threshold line and interactive tooltips (T-013).
+- Added printable Telerehabilitation Session Summary PDF Report generator component `TelerehabReportPrint.tsx` with `@media print` layout, patient clinical profile, safety limits, repetition history breakdown, zero-video privacy compliance statement (UU PDP No. 27/2022), and physiotherapist verification sign-off block (T-014).
 - Implemented post-exercise session analytics dashboard on `/summary` featuring 4 core metric cards (Active Duration, Safe Repetitions & Compliance Rate, Peak Flexion RoM, Red Zone Breach Count), detailed repetition audit log, and seamless multi-path navigation (T-012).
 - Implemented live exercise tracking hero screen on `/tracking` with HTML5 Canvas skeleton overlay, real-time knee flexion angle bubble, dynamic 3-zone color banner, and emergency stop button (T-010).
 - Implemented Finite State Machine (FSM) repetition counter and session aggregator hook `useExerciseTracking.ts` inspired by Nicholas Renotte pattern, recording repetition RoM, safe vs warning counts, and audio biofeedback cues (T-011).

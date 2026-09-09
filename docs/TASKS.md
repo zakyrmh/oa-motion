@@ -83,8 +83,8 @@ Dokumen ini memecah kebutuhan produk dari `PRD.md` dan `OA-Motion_Dev_Guide.md` 
 | **T-010** | Implementasi Layar `Tracking.tsx` | Hero screen latihan: Canvas skeleton overlay, badge sudut real-time, dan status banner 3 zona. | P0 | T-005, T-008, T-009 | 🟢 | Zaky Ramadhan |
 | **T-011** | Emergency Stop & Session Aggregator | Logika tombol berhenti darurat, pencatatan durasi latihan, peak RoM, dan frekuensi peringatan. | P0 | T-010 | 🟢 | Zaky Ramadhan |
 | **T-012** | Implementasi Layar `Summary.tsx` | Dashboard pasca-latihan: 4 kartu metrik (Durasi, RoM, Warning Red Zone, Kepatuhan). | P0 | T-011 | 🟢 | Zaky Ramadhan |
-| **T-013** | Visualisasi Grafik RoM Sesi Terakhir | Render grafik garis tren sudut fleksi 1 sesi terakhir dengan garis batas ambang zona aman. | P1 | T-012 | 🔴 | Zaky Ramadhan |
-| **T-014** | Generator Unduh PDF Ringkasan Sesi | Fitur unduh rekapitulasi data telerehabilitasi 1 sesi terstruktur untuk dibagikan ke fisioterapis. | P1 | T-012 | 🔴 | Zaky Ramadhan |
+| **T-013** | Visualisasi Grafik RoM Sesi Terakhir | Render grafik garis tren sudut fleksi 1 sesi terakhir dengan garis batas ambang zona aman. | P1 | T-012 | 🟢 | Zaky Ramadhan |
+| **T-014** | Generator Unduh PDF Ringkasan Sesi | Fitur unduh rekapitulasi data telerehabilitasi 1 sesi terstruktur untuk dibagikan ke fisioterapis. | P1 | T-012 | 🟢 | Zaky Ramadhan |
 
 ---
 
@@ -184,3 +184,4 @@ Setiap tugas pengembangan perangkat lunak dalam proyek ini dianggap **Selesai (�
 | 23/08/2026 | Pembaruan status tugas T-001 hingga T-004 menjadi Selesai (🟢) serta penyelarasan struktur folder modular. | Zaky Ramadhan |
 | 01/09/2026 | Sinkronisasi dengan `OA-Motion_Dev_Guide.md`: penyelesaian seluruh tugas Fase 2 (T-005 s.d T-009 🟢), penambahan T-002B, dan penyederhanaan cakupan MVP. | Tim SPEKTRA |
 | 03/09/2026 | Implementasi T-002B (Medical Disclaimer Banner eksklusi Grade 4 & Selector Sisi Lutut di `Home.tsx` 🟢). | Zaky Ramadhan |
+| 09/09/2026 | Penyelesaian tugas T-013 (Visualisasi Grafik RoM Sesi Terakhir 🟢) dan T-014 (Generator Unduh PDF Ringkasan Sesi 🟢). | Zaky Ramadhan |
