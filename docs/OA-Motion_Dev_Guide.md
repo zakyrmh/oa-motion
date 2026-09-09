@@ -1,130 +1,198 @@
-# OA-Motion — Panduan Pengembangan Web App
+# OA-Motion — Panduan Pengembangan Web App (v2)
 
-Dokumen ini adalah rujukan teknis untuk agent AI (misalnya Claude Code) yang akan membangun purwarupa web app OA-Motion untuk kebutuhan demo Samsung Solve for Tomorrow 2026. Isinya merangkum konsep final tim SPEKTRA setelah melalui beberapa putaran revisi berdasarkan masukan mentor, dan menandai secara eksplisit bagian mana yang masih berupa parameter sementara (butuh validasi klinis) versus bagian yang sudah siap diimplementasikan sebagai purwarupa.
+Versi ini menggantikan draf sebelumnya. Perubahan utama: arsitektur personalisasi bergeser dari "tabel ambang derajat per grade OA" (yang sumbernya belum ada) menjadi pendekatan **perbandingan terhadap gerakan referensi** (golden reference) plus **baseline kelelahan adaptif per sesi**, mengikuti arahan Pak Oji dan literatur yang sudah diverifikasi. Riwayat perubahan ada di bagian paling bawah.
 
-Konvensi penandaan di dokumen ini: teks berformat `[BUTUH VALIDASI: ...]` berarti nilai atau logika tersebut adalah asumsi awal untuk keperluan demo, dan wajib dikonfirmasi ke fisioterapis mitra sebelum dipakai di luar tahap purwarupa.
+Konvensi penandaan: `[BUTUH VALIDASI: ...]` berarti keputusan sementara untuk demo yang wajib dikonfirmasi sebelum dipakai di luar tahap purwarupa. `[VERIFIKASI SITASI]` berarti klaim akademis yang perlu dicek ulang detail bibliografinya (volume/halaman/DOI) langsung ke sumber sebelum dipakai formal di paper.
 
 ---
 
 ## 1. Ringkasan konsep
 
-OA-Motion adalah aplikasi web yang memandu penderita osteoarthritis (OA) lutut melakukan gerakan squat dan latihan penguatan lain secara mandiri dan aman di rumah, memakai kamera bawaan laptop atau smartphone. Sistem mendeteksi pose tubuh secara real-time, menghitung sudut sendi lutut, dan memberi umpan balik visual serta suara sebelum pengguna mencapai sudut gerakan yang berisiko bagi kondisi mereka.
+OA-Motion adalah aplikasi web yang memandu penderita osteoarthritis (OA) lutut dan lansia melakukan latihan penguatan otot tungkai bawah secara mandiri dan aman di rumah, memakai kamera bawaan laptop atau smartphone yang terkoneksi internet. Sistem membandingkan gerakan pengguna secara real-time terhadap pola gerakan referensi yang direkam dari instruktur/fisioterapis, memberi umpan balik sebelum gerakan berisiko terjadi, menghitung repetisi, dan bisa melaporkan ringkasan sesi ke keluarga atau pendamping pengguna.
 
-Masalah inti yang dijawab: penderita OA tahu bahwa olahraga terkontrol membantu memperlambat degenerasi sendi, tapi mereka berhenti berolahraga karena dua hal, yaitu tidak tahu batas gerakan yang aman untuk kondisi mereka, dan tidak sanggup membayar fisioterapis secara rutin untuk pendampingan.
+Masalah inti yang dijawab: orang tua/penderita OA ingin tetap aktif ("usia bukan alasan untuk lemah"), tapi berhenti berolahraga karena tidak tahu gerakan mana yang aman, dan tidak sanggup membayar pendampingan fisioterapis secara rutin.
 
-Prinsip desain utama, urut dari yang paling penting:
+Prinsip desain, urut dari yang paling penting:
 
-1. **Preventif, bukan evaluatif.** Sistem memperingatkan sebelum sudut berisiko tercapai, bukan menilai setelah gerakan selesai.
-2. **Personal per pengguna, bukan generik.** Batas aman gerakan (adaptive thresholding) menyesuaikan grade OA masing-masing pengguna, bukan satu standar untuk semua orang.
-3. **Zero hardware barrier.** Hanya kamera bawaan perangkat, tanpa sensor atau wearable tambahan.
-4. **Squat sebagai gerakan inti.** Bukan sekadar satu dari banyak gerakan, tapi gerakan yang paling dipoles untuk demo, karena fungsional secara olahraga (bukan cuma medis) dan parameter keamanannya (kedalaman, lebar tumpuan, rotasi kaki) paling relevan dipantau dengan computer vision.
-
----
-
-## 2. Target pengguna
-
-- **Utama:** penderita OA lutut grade 1 sampai 3, terutama perempuan usia 40 tahun ke atas, dan individu pasca operasi lutut dalam masa pemulihan.
-- **Sekunder:** masyarakat usia produktif yang ingin mencegah cedera sendi lewat pemantauan form gerakan, serta fisioterapis yang memakai data OA-Motion sebagai laporan progres pasien.
-- **Eksplisit di luar cakupan:** OA grade 4 (kondisi berat, sudah sulit berjalan). Gerakan squat pada kedalaman berapa pun tetap butuh pengawasan klinis langsung pada tingkat keparahan ini, jadi aplikasi tidak dirancang untuk kelompok ini.
-
-Dua persona kerja (representasi kebutuhan, bukan hasil wawancara individu):
-
-- **Ibu Hartini, 68 tahun** — OA grade 2, tinggal sendiri, tidak terbiasa aplikasi rumit. Butuh instruksi sederhana, suara jelas, dan kepastian gerakan yang dilakukan aman.
-- **Pak Doni, 54 tahun** — pasca operasi lutut, aktif bekerja. Butuh konfirmasi objektif bahwa gerakannya benar tanpa harus bolak-balik ke klinik.
-
-Implikasi desain UI: font besar, kontras tinggi, navigasi minimal (idealnya tidak lebih dari 2-3 tap untuk mulai sesi latihan), instruksi suara berbahasa Indonesia, dan hindari istilah teknis di antarmuka pengguna akhir.
+1. **Preventif, bukan evaluatif.** Sistem memperingatkan sebelum pola gerakan menyimpang jauh dari referensi aman, bukan menilai setelah gerakan selesai.
+2. **Personal lewat data sesi sendiri, bukan tabel klinis eksternal.** Baseline kemampuan pengguna dibangun dari repetisi awal tiap sesi (lihat bagian 5), bukan dari tabel ambang grade OA yang sumbernya tidak bisa kita pertanggungjawabkan.
+3. **Golden reference dari pelatih sungguhan.** Pola gerakan yang benar direkam dari instruktur/fisioterapis asli sebagai data primer, bukan diasumsikan dari literatur. Ini juga jawaban konkret atas kritik soal keaslian data riset.
+4. **Zero hardware barrier.** Hanya kamera bawaan perangkat.
+5. **Progresi bertahap.** Sit-to-stand dulu sebagai gerakan skrining/pemanasan, baru squat dengan kedalaman meningkat bertahap.
 
 ---
 
-## 3. Lingkup MVP untuk demo
+## 2. Target pengguna dan profil
 
-Karena tujuan saat ini adalah purwarupa yang bisa didemokan, bukan produk produksi penuh, berikut pembagian prioritas.
+Field profil pengguna diganti dari "grade OA" (yang butuh data klinis eksternal) menjadi kapabilitas fungsional yang bisa diisi pengguna sendiri di awal, sesuai arahan Pak Oji:
 
-### Harus ada untuk demo
-- Deteksi pose real-time dari kamera (webcam laptop cukup untuk demo).
-- Kalkulasi sudut lutut secara live saat squat.
-- Indikator tiga zona (hijau, kuning, merah) yang berubah sesuai sudut real-time.
-- Minimal dua profil grade OA yang bisa dipilih (misalnya grade 1 dan grade 3) untuk menunjukkan adaptive thresholding bekerja beda pada tiap profil.
-- Ringkasan sesi sederhana setelah selesai (durasi, jumlah pengulangan, jumlah peringatan zona merah).
+```
+UserProfile {
+  id: string
+  namaPanggilan: string
+  kapabilitas: "hanya_duduk" | "duduk_dan_berdiri"
+  pendampingan: "mandiri" | "butuh_pendamping"
+  targetRepetisiPerSesi: number   // contoh default: 10
+  kontakKeluarga: string (opsional, untuk fitur report)
+}
+```
 
-### Bagus untuk demo, tapi boleh disederhanakan
-- Panduan kalibrasi kamera otomatis dengan bounding box. Untuk demo, boleh diganti instruksi statis ("berdiri di sini, kamera sejajar lutut") tanpa validasi otomatis penuh.
-- Umpan balik suara. Untuk demo, cukup memakai Web Speech API bawaan browser untuk teks ke suara berbahasa Indonesia, tidak perlu model TTS custom.
-- Grafik riwayat progres. Untuk demo, cukup grafik satu sesi terakhir, tidak perlu histori multi-minggu.
+Dua persona kerja tetap relevan sebagai acuan kebutuhan (representasi kebutuhan, bukan hasil wawancara individu):
 
-### Tidak perlu untuk demo, taruh di roadmap
-- Autentikasi pengguna penuh dan manajemen akun multi-user.
-- Enkripsi AES-256 dan kepatuhan penuh UU PDP/Permenkes Rekam Medis (tetap sebutkan sebagai rencana di paper dan pitch, tapi tidak wajib diimplementasikan penuh untuk purwarupa demo).
-- Fitur berbagi laporan ke fisioterapis (telerehabilitation) versi lengkap. Untuk demo, cukup tombol "unduh ringkasan sesi" sebagai bukti konsep.
-- Deteksi anomali gerakan asimetris dan personalisasi berkelanjutan lintas sesi (fitur lapisan AI tahap lanjut, bukan prioritas MVP).
+- **Ibu Hartini, 68 tahun** — tinggal sendiri, tidak terbiasa aplikasi rumit, butuh instruksi sederhana dan kepastian gerakan aman. Cocok dengan mode `mandiri` (lihat bagian 4).
+- **Pak Doni, 54 tahun** — pasca operasi lutut, aktif bekerja, butuh konfirmasi objektif bahwa gerakannya benar. Kebutuhannya persis dijawab oleh fitur "feedback yang memastikan gerakan pasca operasi tidak mencederai ulang sendi" yang disebut Pak Oji.
+
+Eksplisit di luar cakupan: kondisi yang butuh pengawasan klinis langsung (misalnya OA berat/grade 4 atau pasca operasi yang belum dapat izin bergerak dari dokter). Ini disebutkan di layar profil, bukan hanya di halaman disclaimer terpisah.
+
+---
+
+## 3. Sumber data referensi ("golden data")
+
+Ini bagian yang paling penting diperbaiki dari draf sebelumnya. Sistem **tidak** mengambil ambang batas dari tabel klinis eksternal. Sebagai gantinya:
+
+1. Rekam beberapa sesi gerakan (sit-to-stand dan squat bertahap) yang dilakukan oleh instruktur/fisioterapis mitra yang gerakannya sudah dikonfirmasi benar secara klinis. Ini jadi data primer asli tim, bukan asumsi dari literatur, dan langsung menjawab permintaan mentor soal keaslian data.
+2. Simpan gerakan referensi ini sebagai deret waktu sudut sendi (bukan video mentah), yaitu barisan sudut lutut dan panggul per frame sepanjang satu repetisi penuh.
+3. Karena perbandingan berbasis sudut sendi (bukan koordinat piksel absolut), perbedaan tinggi badan atau panjang tungkai antara pengguna dan model referensi tidak jadi masalah. Sudut adalah besaran relatif.
+4. `[BUTUH VALIDASI]` Jumlah repetisi referensi minimal yang direkam per gerakan, dan apakah perlu lebih dari satu model referensi (misalnya varian tubuh berbeda) untuk generalisasi yang lebih baik.
 
 ---
 
 ## 4. Alur pengguna (user flow)
 
-1. **Pilih profil.** Pengguna memilih atau mengisi grade OA (untuk demo, cukup dropdown grade 1/2/3, tanpa form medis penuh).
-2. **Kalibrasi kamera.** Instruksi memposisikan kamera sejajar lutut, jarak sekitar 1,5-2 meter, sisi tubuh menghadap kamera (bidang kardinal lateral), supaya sudut lutut terbaca akurat.
-3. **Mulai sesi squat.** Pose estimation berjalan real-time, sudut lutut dihitung tiap frame, indikator warna berubah sesuai kedekatan dengan batas aman.
-4. **Umpan balik langsung.** Saat mendekati batas zona kuning, tampil peringatan visual dan suara sebelum masuk zona merah.
-5. **Ringkasan sesi.** Setelah sesi selesai, tampilkan durasi, jumlah pengulangan, rata-rata sudut, dan jumlah peringatan yang muncul.
+1. **Isi profil.** Kapabilitas (duduk saja/duduk dan berdiri), status pendampingan (mandiri/butuh pendamping), target repetisi per sesi.
+2. **Kalibrasi kamera.** Posisi kamera pada jarak sekitar 3 meter, serong 45 derajat dari pengguna. `[BUTUH VALIDASI, lihat bagian 7]`
+3. **Pilih mode.**
+   - **Mandiri (independent):** aplikasi menampilkan contoh gerakan referensi (overlay skeleton atau video contoh) sebelum dan selama sesi, karena tidak ada pendamping yang mengoreksi secara langsung.
+   - **Dengan pendamping:** overlay referensi opsional, karena pendamping bisa membantu koreksi manual.
+4. **Sesi latihan.**
+   - Tahap 1: sit-to-stand (gerakan duduk ke berdiri) sebagai skrining kemampuan dan pemanasan.
+   - Tahap 2: squat bertahap, dimulai dari kedalaman dangkal menuju target tertentu, bukan langsung squat penuh.
+   - Sistem membandingkan pola gerakan pengguna terhadap referensi secara real-time (lihat bagian 5), menghitung repetisi, dan memberi umpan balik sebelum penyimpangan gerakan terlalu jauh dari pola aman.
+5. **Ringkasan sesi.** Durasi, jumlah repetisi tercapai dari target, skor kemiripan gerakan rata-rata, indikasi kelelahan (lihat bagian 5).
+6. **Laporan ke keluarga (opsional).** Ringkasan sesi bisa dikirim/diunduh untuk dilihat kontak keluarga yang didaftarkan di profil.
 
 ---
 
-## 5. Arsitektur teknis yang disarankan
+## 5. Arsitektur teknis
 
-Karena ini web app, pose estimation sebaiknya berjalan di sisi klien (browser), bukan server, untuk dua alasan: latensi lebih rendah untuk real-time feedback, dan tidak perlu mengirim video ke server (selaras dengan prinsip privasi data medis).
+Pose estimation tetap disarankan berjalan di sisi klien (browser) untuk latensi rendah dan privasi (video tidak perlu dikirim ke server).
 
-- **Pose estimation:** MediaPipe Tasks Vision (`@mediapipe/tasks-vision`), model `PoseLandmarker`, berjalan di browser lewat WebAssembly/WebGL. Ini adalah versi web dari MediaPipe Pose (arsitektur BlazePose) yang dipakai di konsep paper.
-- **Kalkulasi sudut:** hitung sudut lutut dari tiga titik landmark (pergelangan kaki, lutut, panggul) memakai aturan kosinus di sisi klien, setiap frame.
-  ```
-  sudut = arccos( (v1 . v2) / (|v1| * |v2|) )
-  ```
-  di mana v1 adalah vektor dari lutut ke pergelangan kaki, dan v2 adalah vektor dari lutut ke panggul.
-- **Adaptive thresholding:** logika sederhana berupa lookup table sudut aman per grade OA. `[BUTUH VALIDASI: nilai ambang derajat fleksi lutut per grade OA di bawah ini adalah placeholder awal untuk demo, bukan angka klinis final]`
+### Ekstraksi pose dan kalkulasi sudut
+- **Pose estimation:** MediaPipe Tasks Vision (`@mediapipe/tasks-vision`), model `PoseLandmarker`, berjalan di browser lewat WebAssembly/WebGL.
+- **Kalkulasi sudut:** aturan kosinus pada tiga titik landmark (pergelangan kaki, lutut, panggul), dihitung tiap frame, sama seperti draf sebelumnya.
+- **Normalisasi:** gunakan strategi *fixed bounding box* untuk menstabilkan pelacakan terhadap pergerakan kamera/tubuh kecil, mengikuti pendekatan Ullah dkk. (2025) [VERIFIKASI SITASI: sudah dicek cocok dengan sumber asli, aman dipakai].
 
-  | Grade OA | Zona hijau (aman) | Zona kuning (waspada) | Zona merah (stop) |
-  |---|---|---|---|
-  | 1 | 0 sampai [BUTUH VALIDASI] derajat | [BUTUH VALIDASI] sampai [BUTUH VALIDASI] derajat | di atas [BUTUH VALIDASI] derajat |
-  | 2 | 0 sampai [BUTUH VALIDASI] derajat | [BUTUH VALIDASI] sampai [BUTUH VALIDASI] derajat | di atas [BUTUH VALIDASI] derajat |
-  | 3 | 0 sampai [BUTUH VALIDASI] derajat | [BUTUH VALIDASI] sampai [BUTUH VALIDASI] derajat | di atas [BUTUH VALIDASI] derajat |
+### Perbandingan terhadap gerakan referensi (menggantikan tabel ambang grade OA)
+- Gunakan **Dynamic Time Warping (DTW)** untuk menyelaraskan ritme/waktu gerakan pengguna terhadap gerakan referensi, karena kecepatan gerakan tiap orang berbeda.
+- Gunakan **Normalized Cross-Correlation (NCC)** untuk mengukur kemiripan pola lintasan sudut sendi antara pengguna dan referensi.
+- Skor kemiripan inilah yang menentukan zona umpan balik (aman/waspada/berhenti), bukan ambang derajat statis dari tabel eksternal.
+- Pendekatan ini mengikuti Ullah dkk. (2025), yang menurut pengujian mereka mengungguli RepNet (model rep counting berbasis video) dari sisi akurasi maupun efisiensi komputasi.
 
-  Untuk keperluan demo saja (bukan klaim klinis), tim boleh memakai asumsi kerja sementara bahwa grade yang lebih berat mendapat batas kedalaman squat yang lebih dangkal, lalu isi tabel di atas dengan angka yang masuk akal secara kualitatif, dan tandai jelas di pitch/demo bahwa angka final menunggu validasi fisioterapis.
-- **Feedback suara:** Web Speech API (`SpeechSynthesisUtterance`, `lang: 'id-ID'`) untuk teks ke suara langsung di browser, cukup untuk demo tanpa dependensi eksternal.
-- **State sesi:** simpan di client-side state (React state atau IndexedDB untuk persist sederhana) untuk demo. Tidak perlu backend database di tahap ini kecuali tim ingin menunjukkan fitur riwayat lintas sesi.
-- **Frontend:** disarankan React, dengan kanvas overlay (HTML canvas di atas video feed) untuk menggambar skeleton landmark dan indikator zona warna secara real-time.
+### Penghitungan repetisi
+- State machine berbasis sudut sendi utama: berdiri (sudut besar) → turun → titik terendah → naik → berdiri lagi = 1 repetisi, mengikuti arsitektur umum sistem rep counting berbasis pose (lihat referensi Alatiah & Chen, dan sistem lima komponen pose estimation-thresholding-optical flow-state machine-counter dari sistem *Pūioio*).
+- Alternatif yang lebih robust jika waktu memungkinkan: model BiLSTM dengan fitur sudut sendi dan koordinat ternormalisasi pada sliding window, yang dilaporkan Riccio (2024) [VERIFIKASI SITASI] mencapai akurasi tinggi untuk squat dan push-up. Untuk MVP demo, state machine berbasis ambang sudut sudah cukup dan jauh lebih sederhana diimplementasikan.
 
-### Struktur data minimal
+### Baseline kelelahan adaptif (fatigue profiling)
+Fitur baru yang menggantikan personalisasi berbasis grade OA:
+- Di awal tiap sesi, sistem membangun baseline personal dari 2-3 repetisi pertama pengguna (kecepatan gerakan, rentang gerak/RoM yang dicapai).
+- Sepanjang sesi, sistem memantau penurunan kecepatan repetisi (*rep speed decay*), pengurangan RoM dibanding baseline awal, dan variabilitas gerakan.
+- Jika terdeteksi tanda kelelahan atau penurunan kualitas gerakan signifikan, sistem menyarankan berhenti atau istirahat, sebagai pencegahan overexertion, mengikuti konsep dari Jain & Kulkarni (2025) [VERIFIKASI SITASI].
+- Pendekatan ini menjawab kebutuhan personalisasi tanpa bergantung pada tabel ambang klinis per grade OA yang sumbernya belum bisa kita pertanggungjawabkan.
+
+### Progresi sit-to-stand ke squat
+- Sit-to-stand dipakai sebagai tahap 1 karena posisi pergelangan kaki relatif tetap di lantai selama gerakan ini, sehingga lebih stabil diukur pose estimation dibanding gerakan berpindah tempat, dan risiko kehilangan keseimbangan lebih rendah dibanding langsung squat penuh.
+- Squat tahap 2 dimulai dari kedalaman dangkal, meningkat bertahap menuju target repetisi yang ditentukan di profil.
+
+### Feedback suara dan visual
+- Indikator tiga zona (hijau/kuning/merah) berdasarkan skor kemiripan DTW/NCC terhadap referensi, bukan lagi berdasarkan ambang derajat statis.
+- Web Speech API (`SpeechSynthesisUtterance`, `lang: 'id-ID'`) untuk umpan balik suara, cukup untuk demo.
+- Mode mandiri menampilkan overlay skeleton referensi di layar sebagai panduan visual tambahan.
+
+### Struktur data sesi
 
 ```
-UserProfile {
-  id: string
-  oaGrade: 1 | 2 | 3
-  kneeSide: "kiri" | "kanan" | "keduanya"
-}
-
 ExerciseSession {
   id: string
   userProfileId: string
   startedAt: timestamp
   endedAt: timestamp
+  tahap: "sit_to_stand" | "squat"
   repCount: number
-  avgKneeAngle: number
-  warningCount: number  // berapa kali masuk zona kuning/merah
+  targetRep: number
+  avgSimilarityScore: number   // hasil DTW/NCC rata-rata terhadap referensi
+  fatigueFlag: boolean         // true jika terdeteksi tanda kelelahan
+  warningCount: number
+}
+
+ReferenceMovement {
+  id: string
+  tahap: "sit_to_stand" | "squat"
+  kedalamanTarget: string
+  angleTimeSeries: number[]   // deret sudut sendi per frame, direkam dari instruktur
 }
 ```
 
 ---
 
-## 6. Batasan dan hal yang wajib disebutkan di aplikasi
+## 6. Fitur laporan ke keluarga/pendamping
 
-- Aplikasi ini adalah alat bantu latihan mandiri, bukan alat diagnostik dan bukan pengganti fisioterapis. Sebutkan ini secara eksplisit di layar onboarding.
-- Aplikasi tidak ditujukan untuk OA grade 4 atau kondisi lutut pasca operasi yang belum mendapat izin bergerak dari dokter. Cantumkan sebagai bagian dari alur pemilihan profil (bukan cuma di halaman terpisah yang mudah dilewati).
-- Karena ini purwarupa demo, akurasi sudut belum divalidasi terhadap goniometer klinis. Jangan menampilkan klaim akurasi angka pasti (misalnya "akurat hingga ±5°") di antarmuka sebelum benar-benar diuji, cukup sebutkan "dalam tahap pengembangan" di UI.
+Sesuai arahan Pak Oji soal pelaporan ke keluarga pengguna:
+- Untuk demo: cukup tombol "unduh/bagikan ringkasan sesi" berisi tanggal, jumlah repetisi, skor kemiripan rata-rata, dan indikasi kelelahan jika ada.
+- Untuk versi lanjutan: notifikasi otomatis (email/WhatsApp) ke kontak keluarga setelah sesi selesai, terutama jika ada tanda kelelahan atau penyimpangan gerakan signifikan.
 
 ---
 
-## 7. Checklist yang masih perlu tim lengkapi sebelum ke tahap berikutnya
+## 7. Catatan terbuka soal setup kamera (perlu didiskusikan lagi ke Pak Oji)
 
-1. Nilai ambang derajat fleksi lutut per grade OA pada tabel adaptive thresholding (bagian 5), idealnya dikonsultasikan ke fisioterapis mitra.
-2. Salinan teks informed consent yang akan ditampilkan sebelum profil medis diisi (belum wajib untuk demo, tapi perlu disiapkan untuk versi lanjutan).
-3. Keputusan apakah demo akan memakai data pengguna sungguhan (dengan consent) atau cukup anggota tim sendiri sebagai demonstrator saat presentasi.
+Pak Oji mengarahkan kamera pada jarak 3 meter, serong 45 derajat, dengan alasan praktis: kalau kamera lurus di depan, MediaPipe kesulitan menangkap sudut lutut saat squat karena satu kaki bisa menutupi kaki lainnya.
+
+Literatur yang sudah kami telusuri memberi gambaran yang sedikit lebih rumit: studi Baldinger dkk. (2025) yang menguji gerakan *lunge* dari empat sudut kamera diagonal menemukan bahwa sudut **depan-diagonal justru menghasilkan deviasi akurasi tertinggi** (sekitar 27%), sementara sudut **belakang** paling akurat (sekitar 13%) karena oklusi paling minim. Studi ini memakai gerakan lunge, bukan squat, jadi pola oklusinya bisa berbeda, tapi ini tetap sinyal bahwa asumsi "serong 45 derajat otomatis lebih baik" belum tentu berlaku sama persis untuk squat.
+
+`[BUTUH VALIDASI]` Rekomendasi konkret: sebelum konfigurasi kamera ini dikunci di kode, uji internal sederhana dengan membandingkan akurasi sudut lutut dari beberapa opsi (depan lurus, depan serong 45 derajat, dan dari belakang/samping) khusus untuk gerakan squat dan sit-to-stand, lalu diskusikan hasilnya dengan Pak Oji sebelum menetapkan konfigurasi final.
+
+---
+
+## 8. Lingkup MVP untuk demo (masih berlaku dari draf sebelumnya)
+
+### Harus ada
+- Deteksi pose real-time dari kamera.
+- Kalkulasi sudut sendi live saat sit-to-stand dan squat.
+- Perbandingan DTW/NCC sederhana terhadap minimal satu gerakan referensi per tahap.
+- Penghitung repetisi berbasis state machine sudut.
+- Indikator tiga zona dan ringkasan sesi.
+
+### Boleh disederhanakan
+- Baseline kelelahan adaptif: untuk demo, cukup tampilkan tren penurunan kecepatan/RoM secara sederhana, tanpa model prediksi kelelahan yang canggih.
+- Overlay skeleton referensi: untuk demo, boleh berupa video contoh statis, tidak harus overlay real-time yang presisi.
+- Laporan ke keluarga: cukup tombol unduh ringkasan, tidak perlu notifikasi otomatis.
+
+### Taruh di roadmap
+- Autentikasi dan manajemen akun multi-user.
+- Enkripsi penuh dan kepatuhan regulasi data medis (tetap disebutkan sebagai rencana di paper).
+- Model BiLSTM untuk rep counting/fatigue jika arsitektur state machine sederhana dirasa belum cukup akurat setelah diuji.
+- Notifikasi otomatis ke keluarga.
+
+---
+
+## 9. Batasan dan hal yang wajib disebutkan di aplikasi
+
+- Aplikasi adalah alat bantu latihan mandiri, bukan alat diagnostik dan bukan pengganti fisioterapis.
+- Tidak ditujukan untuk kondisi yang butuh pengawasan klinis langsung (OA berat, pasca operasi yang belum dapat izin bergerak dari dokter).
+- Skor kemiripan gerakan dan deteksi kelelahan adalah hasil purwarupa yang belum divalidasi klinis penuh, sebutkan sebagai "dalam tahap pengembangan" di UI, jangan tampilkan sebagai klaim akurasi pasti sebelum benar-benar diuji.
+
+---
+
+## 10. Checklist yang masih perlu tim lengkapi
+
+1. Rekam data gerakan referensi (golden data) dari instruktur/fisioterapis mitra untuk sit-to-stand dan squat bertahap.
+2. Uji internal perbandingan akurasi beberapa posisi kamera untuk squat dan sit-to-stand, sebelum mengunci konfigurasi 45 derajat (bagian 7).
+3. Verifikasi detail bibliografi (volume/halaman/DOI) untuk sitasi yang masih ditandai `[VERIFIKASI SITASI]` sebelum masuk paper final.
+4. Tentukan jumlah minimal repetisi referensi yang perlu direkam per gerakan untuk generalisasi yang wajar (bagian 3).
+5. Salinan teks informed consent untuk perekaman data referensi dan data sesi pengguna (belum wajib untuk demo internal, tapi perlu disiapkan untuk versi lanjutan).
+
+---
+
+## Riwayat perubahan
+
+- **v2 (saat ini):** mengganti adaptive thresholding berbasis tabel grade OA dengan pendekatan golden-reference (DTW+NCC) dan baseline kelelahan adaptif, mengikuti arahan Pak Oji dan literatur terverifikasi (Ullah dkk. 2025, Baldinger dkk. 2025, Pratapneni dkk. 2026, Michaels dkk. 2026). Menambahkan progresi sit-to-stand ke squat, field profil berbasis kapabilitas fungsional, fitur laporan keluarga, dan catatan terbuka soal validasi sudut kamera.
+- **v1:** versi awal dengan adaptive thresholding berbasis tabel ambang grade OA (tabel `[BUTUH VALIDASI]` yang sumbernya tidak pernah ditemukan).
