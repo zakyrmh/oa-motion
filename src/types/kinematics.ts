@@ -1,8 +1,14 @@
+import type { SafetyZone } from './clinical';
+export type { SafetyZone };
+
+
+
 export interface Point2D {
   x: number; // Normalized 0.0 - 1.0
   y: number; // Normalized 0.0 - 1.0
   visibility?: number;
 }
+
 
 export interface Point3D extends Point2D {
   z?: number;
@@ -55,4 +61,12 @@ export interface ReferenceMovement {
   angleTimeSeries: number[];
   keyPhaseIndices: ReferenceMovementKeyPhases;
 }
+
+export interface SimilarityResult {
+  dtwDistance: number;
+  similarityScorePercent: number; // 0 - 100%
+  nccScore: number;               // -1.0 hingga 1.0 (Normalized Cross-Correlation)
+  zone: SafetyZone;               // 'GREEN' | 'YELLOW' | 'RED'
+}
+
 
