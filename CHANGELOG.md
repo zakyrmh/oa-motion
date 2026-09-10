@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `RepetitionBaseline` and `FatigueEvaluation` interfaces in `src/types/session.ts` (T-024).
+- Implemented Adaptive Fatigue Detector (`fatigueDetector.ts`) with baseline profiling (`createRepetitionBaseline`), real-time repetition fatigue evaluation (`evaluateRepetitionFatigue`), and `AdaptiveFatigueTracker` stateful tracker in `src/engine/kinematics/` (T-024).
 - Added `SimilarityResult` interface in `src/types/kinematics.ts` (T-023).
+
 - Implemented Kinematics Similarity Engine (`dtwCalculator.ts`) with Dynamic Time Warping (`calculateDTWDistance`), Normalized Cross-Correlation (`calculateNCCSimilarity`), and 3-zone movement similarity scoring (`calculateMovementSimilarity`) in `src/engine/kinematics/` (T-023).
 - Added `ReferenceMovement` and `MovementType` types in `src/types/kinematics.ts` and exported via `src/types/index.ts` (T-022).
 
