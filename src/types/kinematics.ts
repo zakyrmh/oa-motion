@@ -36,3 +36,23 @@ export interface ParallaxVerification {
   hipWidthRatio: number;
   message: string;
 }
+
+export type MovementType = 'sit_to_stand' | 'squat';
+
+export interface ReferenceMovementKeyPhases {
+  flexionStart: number;
+  peakFlexion: number;
+  extensionComplete: number;
+}
+
+export interface ReferenceMovement {
+  id: string;
+  type: MovementType;
+  name: string;
+  description: string;
+  samplingRateHz: number;
+  totalDurationSeconds: number;
+  angleTimeSeries: number[];
+  keyPhaseIndices: ReferenceMovementKeyPhases;
+}
+

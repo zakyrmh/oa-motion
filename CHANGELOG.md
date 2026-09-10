@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ReferenceMovement` and `MovementType` types in `src/types/kinematics.ts` and exported via `src/types/index.ts` (T-022).
+- Added `GOLDEN_DATA_SIT_TO_STAND` and `GOLDEN_DATA_SQUAT` reference movement datasets (`angleTimeSeries`) in `src/constants/goldenData.ts` (T-022).
+- Added reference data loader and resampling utility functions (`getReferenceMovement`, `getAllReferenceMovements`, `normalizeTimeSeries`) in `src/engine/kinematics/referenceDataLoader.ts` (T-022).
+
+
 - Added SVG visual trend chart component `RoMChart.tsx` on `/summary` displaying repetition-by-repetition Range of Motion (RoM) knee flexion angle trend curve with clinical safe limit threshold line and interactive tooltips (T-013).
 - Added printable Telerehabilitation Session Summary PDF Report generator component `TelerehabReportPrint.tsx` with `@media print` layout, patient clinical profile, safety limits, repetition history breakdown, zero-video privacy compliance statement (UU PDP No. 27/2022), and physiotherapist verification sign-off block (T-014).
 - Implemented post-exercise session analytics dashboard on `/summary` featuring 4 core metric cards (Active Duration, Safe Repetitions & Compliance Rate, Peak Flexion RoM, Red Zone Breach Count), detailed repetition audit log, and seamless multi-path navigation (T-012).

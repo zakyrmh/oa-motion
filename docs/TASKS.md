@@ -94,7 +94,8 @@ Dokumen ini memecah kebutuhan produk dari `PRD.md` (v2.0) dan `OA-Motion_Dev_Gui
 
 | ID | Tugas | Deskripsi | Prioritas | Dependency | Status | PIC |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **T-022** | Perekaman & Pemuatan Golden Data Referensi | Menyiapkan dataset `ReferenceMovement` (`angleTimeSeries`) untuk *Sit-to-Stand* dan *Squat* dari instruktur/fisioterapis mitra. | P0 | T-006 | 🔴 | Naufal Khalil Aldeza |
+| **T-022** | Perekaman & Pemuatan Golden Data Referensi | Menyiapkan dataset `ReferenceMovement` (`angleTimeSeries`) untuk *Sit-to-Stand* dan *Squat* dari instruktur/fisioterapis mitra. | P0 | T-006 | 🟢 | Naufal Khalil Aldeza |
+
 | **T-023** | Kinematics Similarity Engine `dtwCalculator.ts` | Pembangunan modul `dtwCalculator.ts` (Dynamic Time Warping & NCC) untuk mengukur skor kemiripan gerakan aktif vs *golden data*. | P0 | T-022 | 🔴 | Naufal Khalil Aldeza |
 | **T-024** | Baseline Kelelahan Adaptif `fatigueDetector.ts` | Pembangunan modul `fatigueDetector.ts` untuk merekam baseline 2–3 rep awal, memantau *rep speed decay* & kemerosotan RoM (`fatigueFlag`). | P1 | T-023 | 🔴 | Naufal Khalil Aldeza |
 | **T-025** | Refactor Data Contract & Context `UserProfile` v2.0 | Refactor tipe `UserProfile`, `MedicalProfileContext`, dan `localStorage` dari Grade OA statis ke Kapabilitas Fungsional & Status Pendampingan. | P0 | T-004 | 🔴 | Zaky Ramadhan |
@@ -195,3 +196,5 @@ Setiap tugas pengembangan perangkat lunak dalam proyek ini dianggap **Selesai (�
 | 03/09/2026 | Implementasi T-002B (Medical Disclaimer Banner eksklusi Grade 4 & Selector Sisi Lutut di `Home.tsx` 🟢). | Zaky Ramadhan |
 | 09/09/2026 | Penyelesaian tugas T-013 (Visualisasi Grafik RoM Sesi Terakhir 🟢) dan T-014 (Generator Unduh PDF Ringkasan Sesi 🟢). | Zaky Ramadhan |
 | 09/09/2026 | Sinkronisasi dengan PRD v2.0 & Dev Guide v2: penambahan Fase 3B (Tugas Refactor v2.0 T-022 s.d T-028) dan penyesuaian deadline submission ke 20 September 2026. | Zaky Ramadhan |
+| 11/09/2026 | Penyelesaian tugas T-022 (Perekaman & Pemuatan Golden Data Referensi `ReferenceMovement` `angleTimeSeries` untuk Sit-to-Stand & Squat 🟢). | Naufal Khalil Aldeza |
+
