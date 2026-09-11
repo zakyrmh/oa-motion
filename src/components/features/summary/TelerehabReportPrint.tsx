@@ -1,13 +1,11 @@
 import type { ExerciseSessionSummary } from '@/types/session';
-import { SAFE_ROM_LIMITS } from '@/constants/clinical';
 
 interface TelerehabReportPrintProps {
   sessionSummary: ExerciseSessionSummary;
 }
 
 export function TelerehabReportPrint({ sessionSummary }: TelerehabReportPrintProps) {
-  const profile = sessionSummary.medicalProfile;
-  const limits = SAFE_ROM_LIMITS[profile.oaGrade];
+  const profile = sessionSummary.userProfile;
 
   const redWarnings = sessionSummary.repetitionHistory.filter((r) => !r.isSafeRoM).length;
   const complianceRate =
@@ -54,27 +52,27 @@ export function TelerehabReportPrint({ sessionSummary }: TelerehabReportPrintPro
       <div className="grid grid-cols-2 gap-4 mb-6 border border-black p-4 rounded-xl bg-gray-50">
         <div>
           <h3 className="font-mono font-bold text-xs text-black uppercase mb-2 border-b border-gray-300 pb-1">
-            PROFIL KONDISI MEDIS PASIEN
+            PROFIL LATIHAN PENGGUNA
           </h3>
           <table className="w-full text-xs font-mono">
             <tbody>
               <tr>
-                <td className="text-gray-600 py-0.5">Grade OA Lutut:</td>
-                <td className="font-bold text-black py-0.5">{profile.oaGrade.toUpperCase()}</td>
+                <td className="text-gray-600 py-0.5">Nama panggilan:</td>
+                <td className="font-bold text-black py-0.5">{profile.namaPanggilan || 'Tidak diisi'}</td>
               </tr>
               <tr>
                 <td className="text-gray-600 py-0.5">Sisi Lutut Target:</td>
                 <td className="font-bold text-black py-0.5">
-                  {profile.targetKnee === 'right' ? 'Lutut Kanan' : 'Lutut Kiri'}
+                  {profile.kapabilitas === 'hanya_duduk' ? 'Hanya duduk' : 'Duduk dan berdiri'}
                 </td>
               </tr>
               <tr>
-                <td className="text-gray-600 py-0.5">Skala Nyeri VAS Mandiri:</td>
-                <td className="font-bold text-black py-0.5">{profile.painScale} / 10</td>
+                <td className="text-gray-600 py-0.5">Pendampingan:</td>
+                <td className="font-bold text-black py-0.5">{profile.pendampingan === 'mandiri' ? 'Mandiri' : 'Butuh pendamping'}</td>
               </tr>
               <tr>
-                <td className="text-gray-600 py-0.5">Riwayat Operasi Lutut:</td>
-                <td className="font-bold text-black py-0.5">{profile.hasKneeSurgery ? 'Ya' : 'Tidak'}</td>
+                <td className="text-gray-600 py-0.5">Target repetisi:</td>
+                <td className="font-bold text-black py-0.5">{profile.targetRepetisiPerSesi} repetisi</td>
               </tr>
             </tbody>
           </table>
@@ -82,21 +80,21 @@ export function TelerehabReportPrint({ sessionSummary }: TelerehabReportPrintPro
 
         <div>
           <h3 className="font-mono font-bold text-xs text-black uppercase mb-2 border-b border-gray-300 pb-1">
-            BATASAN AMBANG SAFETY KLINIS
+            RINGKASAN EVALUASI GERAKAN
           </h3>
           <table className="w-full text-xs font-mono">
             <tbody>
               <tr>
-                <td className="text-gray-600 py-0.5">Batas Maksimal Safe RoM:</td>
-                <td className="font-bold text-black py-0.5">{limits.maxSafeFlexionAngle}° Fleksi</td>
+                <td className="text-gray-600 py-0.5">Skor kemiripan rata-rata:</td>
+                <td className="font-bold text-black py-0.5">{sessionSummary.averageSimilarityScore}%</td>
               </tr>
               <tr>
-                <td className="text-gray-600 py-0.5">Target Waktu Tahan (Hold):</td>
-                <td className="font-bold text-black py-0.5">{limits.targetHoldDurationSeconds} Detik</td>
+                <td className="text-gray-600 py-0.5">Status kelelahan:</td>
+                <td className="font-bold text-black py-0.5">{sessionSummary.fatigueFlag ? 'Terdeteksi' : 'Tidak terdeteksi'}</td>
               </tr>
               <tr>
-                <td className="text-gray-600 py-0.5">Target Repetisi Harian:</td>
-                <td className="font-bold text-black py-0.5">{limits.dailyRepetitionTarget} Repetisi</td>
+                <td className="text-gray-600 py-0.5">Skor form rata-rata:</td>
+                <td className="font-bold text-black py-0.5">{sessionSummary.overallFormScore}/100</td>
               </tr>
               <tr>
                 <td className="text-gray-600 py-0.5">Status Evaluasi Spotter:</td>
@@ -124,8 +122,8 @@ export function TelerehabReportPrint({ sessionSummary }: TelerehabReportPrintPro
             </span>
           </div>
           <div className="border border-black p-3 rounded-lg bg-white">
-            <span className="block font-mono text-[10px] text-gray-500 uppercase font-bold">PUNCAK FLEKSI</span>
-            <span className="text-lg font-black font-mono text-black">{sessionSummary.maxFlexionReached}°</span>
+            <span className="block font-mono text-[10px] text-gray-500 uppercase font-bold">KEMIRIPAN RATA-RATA</span>
+            <span className="text-lg font-black font-mono text-black">{sessionSummary.averageSimilarityScore}%</span>
           </div>
           <div className="border border-black p-3 rounded-lg bg-white">
             <span className="block font-mono text-[10px] text-gray-500 uppercase font-bold">SKOR FORM KESELURUHAN</span>

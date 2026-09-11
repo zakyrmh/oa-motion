@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import type { RefObject } from 'react';
-import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 import { initializePoseLandmarker, detectPose } from '@/engine/kinematics/poseDetector';
+import { LandmarkSmoother } from '@/engine/kinematics/landmarkSmoother';
+import type { Point2D, Point3D, SmoothedPoseFrame } from '@/types/kinematics';
 
 export interface UsePoseTrackingOptions {
-  onResults: (results: PoseLandmarkerResult) => void;
+  onResults: (results: SmoothedPoseFrame) => void;
   enabled?: boolean;
 }
 
@@ -22,6 +23,7 @@ export function usePoseTracking(
   const [error, setError] = useState<string | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const lastVideoTimeRef = useRef<number>(-1);
+  const landmarkSmootherRef = useRef(new LandmarkSmoother(0.35));
 
   // Inisialisasi model MediaPipe sekali saat di-mount
   useEffect(() => {
@@ -60,6 +62,8 @@ export function usePoseTracking(
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
+      landmarkSmootherRef.current.reset();
+      lastVideoTimeRef.current = -1;
       return;
     }
 
@@ -75,7 +79,27 @@ export function usePoseTracking(
           try {
             const timestamp = performance.now();
             const result = detectPose(video, timestamp);
-            onResults(result);
+            const imageLandmarks = result.landmarks[0]?.map((landmark) => ({
+              x: landmark.x,
+              y: landmark.y,
+              visibility: landmark.visibility,
+              presence: (landmark as typeof landmark & { presence?: number }).presence,
+            })) as Point2D[] | undefined;
+            const worldLandmarks = result.worldLandmarks[0]?.map((landmark) => ({
+              x: landmark.x,
+              y: landmark.y,
+              z: landmark.z,
+              visibility: landmark.visibility,
+              presence: (landmark as typeof landmark & { presence?: number }).presence,
+            })) as Point3D[] | undefined;
+            if (imageLandmarks && worldLandmarks) {
+              const smoothed = landmarkSmootherRef.current.filter(
+                imageLandmarks,
+                worldLandmarks,
+                [11, 23, 25, 27, 31]
+              );
+              if (smoothed) onResults({ ...smoothed, timestamp });
+            }
             lastVideoTimeRef.current = currentTime;
           } catch (err) {
             console.error('Gagal memproses frame deteksi pose:', err);

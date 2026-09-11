@@ -1,18 +1,14 @@
 import { useState } from 'react';
 import type { RepetitionRecord } from '@/types/session';
-import type { OAGrade } from '@/types/clinical';
-import { SAFE_ROM_LIMITS } from '@/constants/clinical';
 
 interface RoMChartProps {
   repetitionHistory: RepetitionRecord[];
-  oaGrade: OAGrade;
   className?: string;
 }
 
-export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChartProps) {
+export function RoMChart({ repetitionHistory, className = '' }: RoMChartProps) {
   const [hoveredRep, setHoveredRep] = useState<RepetitionRecord | null>(null);
-  const limits = SAFE_ROM_LIMITS[oaGrade];
-  const maxSafeLimit = limits.maxSafeFlexionAngle;
+  const maxSafeLimit = 80;
 
   // Edge case: if no repetition history exists
   if (!repetitionHistory || repetitionHistory.length === 0) {
@@ -35,8 +31,8 @@ export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChar
   const chartHeight = svgHeight - paddingTop - paddingBottom;
 
   // Y Scale calculations (flexion angle range 0° to maxRange)
-  const maxAngleInHistory = Math.max(...repetitionHistory.map((r) => r.maxFlexionAngle), maxSafeLimit);
-  const yMax = Math.min(140, Math.ceil((maxAngleInHistory + 15) / 10) * 10);
+  const maxAngleInHistory = Math.max(...repetitionHistory.map((r) => r.similarityScore ?? r.formScore), maxSafeLimit);
+  const yMax = Math.min(100, Math.ceil((maxAngleInHistory + 10) / 10) * 10);
   const yMin = 0;
 
   const getX = (index: number) => {
@@ -56,7 +52,7 @@ export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChar
   // Generate path string for trend line
   const points = repetitionHistory.map((rep, idx) => ({
     x: getX(idx),
-    y: getY(rep.maxFlexionAngle),
+    y: getY(rep.similarityScore ?? rep.formScore),
     rep,
   }));
 
@@ -81,11 +77,11 @@ export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChar
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-[#979797] uppercase font-bold">GRAFIK TREN //</span>
             <h4 className="font-mono text-xs text-[#000000] uppercase font-bold tracking-tight">
-              SUDUT FLEKSI LUTUT (RANGE OF MOTION)
+              SKOR KEMIRIPAN GERAKAN
             </h4>
           </div>
           <p className="text-xs font-medium text-[#444444] mt-0.5">
-            Tren fluktuasi sudut tekukan lutut per repetisi terhadap ambang batas aman ({maxSafeLimit}°).
+            Skor DTW/NCC per repetisi terhadap data gerakan referensi lokal.
           </p>
         </div>
 
@@ -93,15 +89,15 @@ export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChar
         <div className="flex items-center gap-3 text-[11px] font-mono font-bold shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-full bg-[#d1ffca] border border-[#000000]" />
-            <span className="text-[#000000]">Aman</span>
+            <span className="text-[#000000]">Serasi</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-full bg-[#EF4444] border border-[#000000]" />
-            <span className="text-[#000000]">Overflex</span>
+            <span className="text-[#000000]">Perlu ulasan</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-[#EF4444] border-t-2 border-dashed border-[#EF4444]" />
-            <span className="text-[#DC2626]">Batas ({maxSafeLimit}°)</span>
+            <span className="text-[#DC2626]">Batas hijau ({maxSafeLimit}%)</span>
           </div>
         </div>
       </div>
@@ -165,7 +161,7 @@ export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChar
             dominantBaseline="middle"
             className="font-mono text-[9px] font-bold fill-[#ffffff] uppercase"
           >
-            BATAS AMAN: {maxSafeLimit}°
+            BATAS HIJAU: {maxSafeLimit}%
           </text>
 
           {/* Shaded Area under Curve */}
@@ -230,7 +226,7 @@ export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChar
                   textAnchor="middle"
                   className="font-mono text-[9px] font-bold fill-[#ffffff]"
                 >
-                  {pt.rep.maxFlexionAngle}°
+                  {pt.rep.similarityScore ?? pt.rep.formScore}%
                 </text>
 
                 {/* X-Axis Rep Label */}
@@ -252,7 +248,7 @@ export function RoMChart({ repetitionHistory, oaGrade, className = '' }: RoMChar
       {hoveredRep ? (
         <div className="bg-[#f3f3f3] border border-[#000000] rounded-xl p-2.5 flex items-center justify-between text-xs font-mono">
           <span className="font-bold text-[#000000]">
-            REPETISI #{hoveredRep.repIndex}: FLEKSI {hoveredRep.maxFlexionAngle}°
+            REPETISI #{hoveredRep.repIndex}: SKOR {hoveredRep.similarityScore ?? hoveredRep.formScore}%
           </span>
           <span
             className={`font-bold px-2 py-0.5 rounded-full ${

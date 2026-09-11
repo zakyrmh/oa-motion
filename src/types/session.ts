@@ -1,4 +1,4 @@
-import type { MedicalProfile } from './clinical';
+import type { UserProfile } from './clinical';
 
 export interface RepetitionRecord {
   repIndex: number;
@@ -7,6 +7,9 @@ export interface RepetitionRecord {
   durationMs?: number; // Total duration of rep cycle in milliseconds
   isSafeRoM: boolean;
   formScore: number; // 0 - 100
+  movementType?: 'sit_to_stand' | 'squat';
+  similarityScore?: number;
+  fatigueFlag?: boolean;
   timestamp: number;
 }
 
@@ -27,13 +30,14 @@ export interface FatigueEvaluation {
 export interface ExerciseSessionSummary {
   sessionId: string;
   date: string; // ISO date string
-  medicalProfile: MedicalProfile;
+  userProfile: UserProfile;
   totalRepsCompleted: number;
   safeRepsCompleted: number;
   maxFlexionReached: number;
   avgHoldDuration: number;
   totalDurationSeconds: number;
   overallFormScore: number;
+  averageSimilarityScore: number;
   repetitionHistory: RepetitionRecord[];
   painScaleAfter?: number;
   fatigueFlag?: boolean;

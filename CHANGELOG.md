@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the v2 `UserProfile` contract with capability-based setup, assistance status, repetition target, and optional family contact (T-025).
+- Refactored Home, Tracking, Summary, and printable reporting flows for the v2 profile model, two-stage movement progression, DTW/NCC similarity scoring, adaptive fatigue flagging, and family sharing (T-026 to T-028).
+- Added safe localStorage fallback for profiles that still contain the retired medical-grade schema.
+
 - Added `RepetitionBaseline` and `FatigueEvaluation` interfaces in `src/types/session.ts` (T-024).
 - Implemented Adaptive Fatigue Detector (`fatigueDetector.ts`) with baseline profiling (`createRepetitionBaseline`), real-time repetition fatigue evaluation (`evaluateRepetitionFatigue`), and `AdaptiveFatigueTracker` stateful tracker in `src/engine/kinematics/` (T-024).
 - Added `SimilarityResult` interface in `src/types/kinematics.ts` (T-023).
@@ -54,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added path alias (`@/*`) configuration in `vite.config.ts`, `tsconfig.json`, and `tsconfig.app.json`.
 
 ### Fixed
+
+- Stabilized MediaPipe pose tracking by gating landmarks with visibility and optional presence scores, smoothing image/world landmarks before rendering or kinematics, and calculating knee flexion from smoothed 3D world landmarks.
+- Raised video pose detection confidence thresholds and kept the `VIDEO` running mode with monotonic frame timestamps for webcam inference.
+- Standardized reference and live angle windows on the same 3D interior-angle convention, fixed selected knee-side indices, and added IndexedDB persistence plus an authorized-role gate for golden-data recording.
 
 - Cleaned up deprecated `baseUrl` and `ignoreDeprecations` options from TypeScript configuration for modern bundler compatibility.
 

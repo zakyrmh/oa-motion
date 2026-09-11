@@ -7,11 +7,18 @@ export interface Point2D {
   x: number; // Normalized 0.0 - 1.0
   y: number; // Normalized 0.0 - 1.0
   visibility?: number;
+  presence?: number;
 }
 
 
 export interface Point3D extends Point2D {
-  z?: number;
+  z: number;
+}
+
+export interface SmoothedPoseFrame {
+  imageLandmarks: Point2D[];
+  worldLandmarks: Point3D[];
+  timestamp: number;
 }
 
 export interface PoseLandmark {

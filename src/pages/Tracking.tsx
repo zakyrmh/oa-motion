@@ -10,7 +10,7 @@ import {
   Square,
   RefreshCw,
 } from 'lucide-react';
-import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import type { SmoothedPoseFrame } from '@/types/kinematics';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layouts/AppLayout';
@@ -19,7 +19,6 @@ import { usePoseTracking } from '@/hooks/usePoseTracking';
 import { useMedicalProfile } from '@/hooks/useMedicalProfile';
 import { useExerciseTracking } from '@/hooks/useExerciseTracking';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
-import { SAFE_ROM_LIMITS } from '@/constants/clinical';
 
 export default function Tracking() {
   const navigate = useNavigate();
@@ -43,22 +42,24 @@ export default function Tracking() {
   const {
     currentAngle,
     currentZone,
+    currentSimilarityScore,
+    activeMovement,
     repsCompleted,
     targetReps,
     redZoneWarnings,
     coachMessage,
     durationSeconds,
+    fatigueFlag,
     processFrameLandmarks,
     finishSession,
     audioCoach,
   } = useExerciseTracking({ profile });
 
   const { isMuted, toggleMute } = audioCoach;
-  const limits = SAFE_ROM_LIMITS[profile.oaGrade];
 
   // Draw skeleton & visual biofeedback on HTML5 Canvas
   const drawOverlay = useCallback(
-    (landmarks: Array<{ x: number; y: number; visibility?: number }>) => {
+    (landmarks: SmoothedPoseFrame['imageLandmarks']) => {
       const canvas = canvasRef.current;
       const video = videoRef.current;
       if (!canvas || !video) return;
@@ -78,12 +79,11 @@ export default function Tracking() {
 
       if (!landmarks || landmarks.length < 33) return;
 
-      const side = profile.targetKnee === 'right' ? 'right' : 'left';
-      const shoulderIdx = side === 'right' ? 12 : 11;
-      const hipIdx = side === 'right' ? 24 : 23;
-      const kneeIdx = side === 'right' ? 26 : 25;
-      const ankleIdx = side === 'right' ? 28 : 27;
-      const footIdx = side === 'right' ? 32 : 31;
+      const shoulderIdx = 11;
+      const hipIdx = 23;
+      const kneeIdx = 25;
+      const ankleIdx = 27;
+      const footIdx = 31;
 
       // Coordinate mapping with horizontal mirroring to match selfie preview
       const toScreen = (pt: { x: number; y: number }) => ({
@@ -193,16 +193,14 @@ export default function Tracking() {
       ctx.textBaseline = 'middle';
       ctx.fillText(angleText, tagX + tagW / 2, tagY + tagH / 2);
     },
-    [currentAngle, currentZone, profile.targetKnee, videoRef]
+    [currentAngle, currentZone, videoRef]
   );
 
   // Frame results callback from MediaPipe Pose Tracking
   const handlePoseResults = useCallback(
-    (result: PoseLandmarkerResult) => {
-      if (result.landmarks && result.landmarks[0]) {
-        processFrameLandmarks(result.landmarks[0]);
-        drawOverlay(result.landmarks[0]);
-      }
+    (frame: SmoothedPoseFrame) => {
+      processFrameLandmarks(frame.worldLandmarks);
+      drawOverlay(frame.imageLandmarks);
     },
     [processFrameLandmarks, drawOverlay]
   );
@@ -241,24 +239,24 @@ export default function Tracking() {
     switch (currentZone) {
       case 'GREEN':
         return {
-          title: 'ZONA AMAN // FLEKSI NORMAL',
-          desc: `Gerakan berada dalam batas aman fleksi (<${limits.maxSafeFlexionAngle - 10}°).`,
+          title: 'ZONA HIJAU // GERAKAN SERASI',
+          desc: `Skor kemiripan ${currentSimilarityScore}%. Gerakan terkontrol.`,
           bg: 'bg-[#d1ffca] text-[#000000]',
           border: 'border-[#d1ffca]',
           icon: <Activity className="size-5 text-[#000000]" />,
         };
       case 'YELLOW':
         return {
-          title: 'ZONA WASPADA // MENDEKATI BATAS TARGET',
-          desc: `Mendekati batas aman maksimal (${limits.maxSafeFlexionAngle}°). Tahan sebentar lalu angkat.`,
+          title: 'ZONA KUNING // PERLU DISESUAIKAN',
+          desc: `Skor kemiripan ${currentSimilarityScore}%. Perlambat dan ikuti pola referensi.`,
           bg: 'bg-[#fff100] text-[#000000]',
           border: 'border-[#fff100]',
           icon: <AlertTriangle className="size-5 text-[#000000]" />,
         };
       case 'RED':
         return {
-          title: 'ZONA BAHAYA // STOP MELEBIHI BATAS AMAN',
-          desc: `Tekukan (${Math.round(currentAngle)}°) melampaui batas toleransi klinis! Segera tegak!`,
+          title: 'ZONA MERAH // HENTIKAN SEMENTARA',
+          desc: `Skor kemiripan ${currentSimilarityScore}%. Kembali ke posisi nyaman.`,
           bg: 'bg-[#EF4444] text-[#ffffff] animate-pulse',
           border: 'border-[#DC2626]',
           icon: <ShieldAlert className="size-5 text-[#ffffff]" />,
@@ -330,8 +328,8 @@ export default function Tracking() {
             LANGKAH 3 DARI 3: LATIHAN
           </Badge>
           <span className="font-mono text-xs text-white/80 font-semibold uppercase hidden sm:inline">
-            {profile.oaGrade.toUpperCase()} •{' '}
-            {profile.targetKnee === 'right' ? 'LUTUT KANAN' : 'LUTUT KIRI'}
+            {activeMovement === 'sit_to_stand' ? 'TAHAP SIT-TO-STAND' : 'TAHAP SQUAT'} •{' '}
+            {profile.pendampingan === 'mandiri' ? 'MODE MANDIRI' : 'DENGAN PENDAMPING'}
           </span>
         </div>
 
@@ -421,14 +419,14 @@ export default function Tracking() {
                     : 'text-[#d1ffca]'
                 }`}
               >
-                {Math.round(currentAngle)}°
+                {currentSimilarityScore}%
               </span>
               <span className="text-xs font-mono text-[#979797]">
-                /{limits.maxSafeFlexionAngle}°
+                /100%
               </span>
             </div>
             <span className="font-mono text-[9px] text-[#979797] uppercase tracking-tighter mt-1.5">
-              BATAS MAKS {limits.maxSafeFlexionAngle}°
+              SKOR KEMIRIPAN
             </span>
           </div>
 
@@ -455,6 +453,12 @@ export default function Tracking() {
             </div>
           </div>
         </div>
+
+        {fatigueFlag && (
+          <div className="rounded-2xl border-2 border-[#fff100] bg-[#fff100] p-3 text-center text-sm font-black uppercase text-black">
+            INDIKASI KELELAHAN // ISTIRAHAT SEBELUM MELANJUTKAN
+          </div>
+        )}
 
         {/* Audio Coach Subtitle Pill */}
         <div className="bg-[#ffffff] text-[#000000] rounded-2xl p-3 sm:p-3.5 flex items-center gap-3 shadow-lg border-2 border-[#000000]">

@@ -100,10 +100,10 @@ Dokumen ini memecah kebutuhan produk dari `PRD.md` (v2.0) dan `OA-Motion_Dev_Gui
 
 | **T-024** | Baseline Kelelahan Adaptif `fatigueDetector.ts` | Pembangunan modul `fatigueDetector.ts` untuk merekam baseline 2–3 rep awal, memantau *rep speed decay* & kemerosotan RoM (`fatigueFlag`). | P1 | T-023 | 🟢 | Naufal Khalil Aldeza |
 
-| **T-025** | Refactor Data Contract & Context `UserProfile` v2.0 | Refactor tipe `UserProfile`, `MedicalProfileContext`, dan `localStorage` dari Grade OA statis ke Kapabilitas Fungsional & Status Pendampingan. | P0 | T-004 | 🔴 | Zaky Ramadhan |
-| **T-026** | Refactor UI `Home.tsx` v2.0 — Form Kapabilitas | Pembaruan form `Home.tsx`: pilihan kapabilitas (hanya duduk / duduk & berdiri), status pendampingan (mandiri/pendamping), target rep, & kontak keluarga. | P0 | T-025 | 🔴 | Zaky Ramadhan |
-| **T-027** | Refactor Layar Latihan `Tracking.tsx` v2.0 | Update `Tracking.tsx` untuk progresi 2 tahap (Sit-to-Stand $\to$ Squat), status banner berbasis skor DTW/NCC, overlay referensi, & indikator kelelahan. | P0 | T-023, T-024, T-026 | 🔴 | Zaky Ramadhan |
-| **T-028** | Refactor `Summary.tsx` v2.0 & Laporan Keluarga | Update `Summary.tsx`: Skor Kemiripan Rata-Rata, status `fatigueFlag`, dan fitur unduh/bagikan ringkasan sesi untuk kontak keluarga (FR-13). | P1 | T-027 | 🔴 | Zaky Ramadhan |
+| **T-025** | Refactor Data Contract & Context `UserProfile` v2.0 | Refactor tipe `UserProfile`, `MedicalProfileContext`, dan `localStorage` dari Grade OA statis ke kapabilitas fungsional dan status pendampingan. | P0 | T-004 | 🟢 | Zaky Ramadhan |
+| **T-026** | Refactor UI `Home.tsx` v2.0 — Form Kapabilitas | Form kapabilitas (hanya duduk / duduk dan berdiri), status pendampingan, target repetisi, dan kontak keluarga. | P0 | T-025 | 🟢 | Zaky Ramadhan |
+| **T-027** | Refactor Layar Latihan `Tracking.tsx` v2.0 | Progresi dua tahap, banner skor DTW/NCC, status gerakan aktif, dan indikator kelelahan. | P0 | T-023, T-024, T-026 | 🟢 | Zaky Ramadhan |
+| **T-028** | Refactor `Summary.tsx` v2.0 & Laporan Keluarga | Skor kemiripan rata-rata, status `fatigueFlag`, log tahap gerakan, serta unduh/bagikan ringkasan sesi. | P1 | T-027 | 🟢 | Zaky Ramadhan |
 
 ---
 
@@ -164,6 +164,14 @@ Dokumen ini memecah kebutuhan produk dari `PRD.md` (v2.0) dan `OA-Motion_Dev_Gui
 - **Kriteria Selesai (Acceptance Criteria):**
   - [ ] Data profil tersimpan dan terbaca konsisten di `localStorage` tanpa menimbulkan breaking changes/error parse pada browser.
 - **File/Modul Terkait:** `src/types/clinical.ts`, `src/context/MedicalProfileContext.ts`, `src/context/MedicalProfileProvider.tsx`
+
+### Implementasi T-025 sampai T-028
+- `UserProfile` menjadi sumber data profil yang dipersistenkan; data localStorage lama diabaikan dengan fallback aman ke profil default v2.
+- Home mengumpulkan nama panggilan, kapabilitas, status pendampingan, target repetisi, dan kontak keluarga opsional.
+- Tracking menjalankan tahap `sit_to_stand` sebelum `squat` untuk profil yang mendukung berdiri, lalu menghitung skor DTW/NCC dan baseline fatigue secara lokal.
+- Summary dan laporan cetak menampilkan skor kemiripan, status `fatigueFlag`, detail tahap, serta berbagi ringkasan tanpa mengirim video.
+- Recorder referensi tersedia pada `/reference-recorder`, menyimpan data ke IndexedDB lokal dan menggunakan cache localStorage untuk pembacaan real-time.
+- Akses recorder ditolak tanpa role `admin` atau `sports_expert`. Untuk produksi, role wajib berasal dari sesi backend terautentikasi; environment/local session hanya disediakan sebagai adapter pengembangan.
 
 ---
 

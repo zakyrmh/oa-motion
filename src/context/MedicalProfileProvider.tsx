@@ -1,20 +1,23 @@
 import { useState, useEffect, type ReactNode } from 'react';
-import type { MedicalProfile } from '@/types/clinical';
-import { DEFAULT_MEDICAL_PROFILE, SAFE_ROM_LIMITS } from '@/constants/clinical';
+import type { UserProfile } from '@/types/clinical';
+import { DEFAULT_USER_PROFILE } from '@/constants/clinical';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { MedicalProfileContext } from './MedicalProfileContext';
 
 export function MedicalProfileProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<MedicalProfile>(() => {
+  const [profile, setProfile] = useState<UserProfile>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.MEDICAL_PROFILE);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved) as Partial<UserProfile>;
+        if (parsed.kapabilitas && parsed.pendampingan && parsed.targetRepetisiPerSesi) {
+          return { ...DEFAULT_USER_PROFILE, ...parsed };
+        }
       }
     } catch {
       // LocalStorage unavailable or parse error
     }
-    return DEFAULT_MEDICAL_PROFILE;
+    return DEFAULT_USER_PROFILE;
   });
 
   // Keep localStorage synced whenever profile changes
@@ -26,21 +29,18 @@ export function MedicalProfileProvider({ children }: { children: ReactNode }) {
     }
   }, [profile]);
 
-  const updateProfile = (updates: Partial<MedicalProfile>) => {
+  const updateProfile = (updates: Partial<UserProfile>) => {
     setProfile((prev) => ({ ...prev, ...updates }));
   };
 
   const resetProfile = () => {
-    setProfile(DEFAULT_MEDICAL_PROFILE);
+    setProfile(DEFAULT_USER_PROFILE);
   };
-
-  const safetyLimits = SAFE_ROM_LIMITS[profile.oaGrade] || SAFE_ROM_LIMITS.grade2;
 
   return (
     <MedicalProfileContext.Provider
       value={{
         profile,
-        safetyLimits,
         updateProfile,
         setProfile,
         resetProfile,

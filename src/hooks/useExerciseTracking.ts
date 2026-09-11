@@ -1,255 +1,203 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { MedicalProfile, SafetyZone } from '@/types/clinical';
-import type { ExercisePhase, Point2D } from '@/types/kinematics';
+import type { UserProfile, SafetyZone } from '@/types/clinical';
+import type { ExercisePhase, Point3D, MovementType } from '@/types/kinematics';
 import type { RepetitionRecord, ExerciseSessionSummary } from '@/types/session';
-import { SAFE_ROM_LIMITS } from '@/constants/clinical';
 import { AUDIO_PHRASES } from '@/constants/audioPhrases';
-import { calculateKneeAngle } from '@/engine/kinematics/angleCalculator';
+import { calculateKneeAngle3D } from '@/engine/kinematics/angleCalculator';
 import { EMAFilter } from '@/engine/kinematics/emaFilter';
-import { getZoneThresholds, determineSafetyZone, determineExercisePhase } from '@/engine/kinematics/rulesEngine';
+import { calculateMovementSimilarity } from '@/engine/kinematics/dtwCalculator';
+import { getReferenceMovement } from '@/engine/kinematics/referenceDataLoader';
+import { AdaptiveFatigueTracker } from '@/engine/kinematics/fatigueDetector';
 import { useAudioCoach } from './useAudioCoach';
 
 export interface UseExerciseTrackingOptions {
-  profile: MedicalProfile;
+  profile: UserProfile;
+}
+
+const SIT_TO_STAND_REPS = 3;
+
+function getMovementForRep(capability: UserProfile['kapabilitas'], repCount: number): MovementType {
+  if (capability === 'hanya_duduk') return 'sit_to_stand';
+  return repCount < SIT_TO_STAND_REPS ? 'sit_to_stand' : 'squat';
 }
 
 export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
   const audioCoach = useAudioCoach(false);
   const { speak, playSuccess, playWarning } = audioCoach;
-
-  const limits = SAFE_ROM_LIMITS[profile.oaGrade];
-  const targetReps = limits.dailyRepetitionTarget;
-  const thresholds = getZoneThresholds(profile.oaGrade);
-
-  // EMA Filter instance for smoothing knee angle
-  const emaFilterRef = useRef<EMAFilter>(new EMAFilter(0.25));
-
-  // Running tracking state
-  const [currentAngle, setCurrentAngle] = useState<number>(0);
+  const targetReps = Math.max(2, Math.min(20, profile.targetRepetisiPerSesi));
+  const fatigueTrackerRef = useRef(new AdaptiveFatigueTracker());
+  const [currentAngle, setCurrentAngle] = useState(0);
   const [currentZone, setCurrentZone] = useState<SafetyZone>('GREEN');
+  const [currentSimilarityScore, setCurrentSimilarityScore] = useState(100);
   const [exercisePhase, setExercisePhase] = useState<ExercisePhase>('REST');
-  const [repsCompleted, setRepsCompleted] = useState<number>(0);
-  const [redZoneWarnings, setRedZoneWarnings] = useState<number>(0);
-  const [maxFlexionReached, setMaxFlexionReached] = useState<number>(0);
-  const [coachMessage, setCoachMessage] = useState<string>(
-    'Posisikan tubuh Anda di depan kamera dan bersiap untuk mulai.'
-  );
-  const [durationSeconds, setDurationSeconds] = useState<number>(0);
-  const [isFinished, setIsFinished] = useState<boolean>(false);
+  const [activeMovement, setActiveMovement] = useState<MovementType>('sit_to_stand');
+  const [repsCompleted, setRepsCompleted] = useState(0);
+  const [redZoneWarnings, setRedZoneWarnings] = useState(0);
+  const [maxFlexionReached, setMaxFlexionReached] = useState(0);
+  const [coachMessage, setCoachMessage] = useState('Posisikan tubuh Anda di depan kamera dan bersiap untuk mulai.');
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [fatigueFlag, setFatigueFlag] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
 
-  // FSM and repetition tracking refs (to avoid stale closures in frame loops)
-  const previousAngleRef = useRef<number>(0);
+  const emaFilterRef = useRef(new EMAFilter(0.25));
+  const previousAngleRef = useRef(180);
   const stageRef = useRef<'UP' | 'DOWN' | 'HOLD'>('UP');
-  const currentRepMaxAngleRef = useRef<number>(0);
-  const currentRepHadRedRef = useRef<boolean>(false);
-  const currentRepHoldFramesRef = useRef<number>(0);
+  const currentRepDeepestAngleRef = useRef(180);
+  const currentRepHadRedRef = useRef(false);
+  const currentRepHoldFramesRef = useRef(0);
+  const currentRepStartedAtRef = useRef<number | null>(null);
+  const currentSeriesRef = useRef<number[]>([]);
+  const cycleStartedRef = useRef(false);
+  const reachedStandingRef = useRef(false);
   const repetitionRecordsRef = useRef<RepetitionRecord[]>([]);
-  const lastWarningTimeRef = useRef<number>(0);
-  const lastInstructionTimeRef = useRef<number>(0);
-  const repsCompletedRef = useRef<number>(0);
-  const redZoneWarningsRef = useRef<number>(0);
-  const maxFlexionReachedRef = useRef<number>(0);
+  const lastWarningTimeRef = useRef(0);
+  const repsCompletedRef = useRef(0);
+  const redZoneWarningsRef = useRef(0);
+  const maxFlexionReachedRef = useRef(0);
 
-  // Session Duration Timer
   useEffect(() => {
     if (isFinished) return;
-    const interval = setInterval(() => {
-      setDurationSeconds((prev) => prev + 1);
-    }, 1000);
+    const interval = setInterval(() => setDurationSeconds((previous) => previous + 1), 1000);
     return () => clearInterval(interval);
   }, [isFinished]);
 
-  // Initial greeting audio
   useEffect(() => {
-    const timer = setTimeout(() => {
-      speak(AUDIO_PHRASES.EXERCISE.START);
-    }, 800);
+    const timer = setTimeout(() => speak(AUDIO_PHRASES.EXERCISE.START), 800);
     return () => clearTimeout(timer);
   }, [speak]);
 
-  /**
-   * Process a single video frame's landmarks
-   */
-  const processFrameLandmarks = useCallback(
-    (landmarks: Point2D[]) => {
-      if (isFinished || !landmarks || landmarks.length < 33) return;
+  const processFrameLandmarks = useCallback((landmarks: Point3D[]) => {
+    if (isFinished || landmarks.length < 33) return;
+    const side = profile.targetKnee === 'right' ? 'right' : 'left';
+    const hipIndex = side === 'right' ? 24 : 23;
+    const kneeIndex = side === 'right' ? 26 : 25;
+    const ankleIndex = side === 'right' ? 28 : 27;
+    const hip = landmarks[hipIndex];
+    const knee = landmarks[kneeIndex];
+    const ankle = landmarks[ankleIndex];
+    if (!hip || !knee || !ankle) return;
 
-      // Select tracked side based on medical profile
-      const side = profile.targetKnee === 'right' ? 'right' : 'left';
-      const hipIndex = side === 'right' ? 24 : 23;
-      const kneeIndex = side === 'right' ? 26 : 25;
-      const ankleIndex = side === 'right' ? 28 : 27;
+    const smoothedAngle = emaFilterRef.current.filter(calculateKneeAngle3D(hip, knee, ankle));
+    const previousAngle = previousAngleRef.current;
+    previousAngleRef.current = smoothedAngle;
+    setCurrentAngle(smoothedAngle);
+    const phase: ExercisePhase = smoothedAngle < 25 ? 'REST' : smoothedAngle >= 30 ? 'FLEXION' : 'EXTENSION';
+    setExercisePhase(phase);
 
-      const hip = landmarks[hipIndex];
-      const knee = landmarks[kneeIndex];
-      const ankle = landmarks[ankleIndex];
+    if (smoothedAngle < maxFlexionReachedRef.current || maxFlexionReachedRef.current === 0) {
+      maxFlexionReachedRef.current = smoothedAngle;
+      setMaxFlexionReached(smoothedAngle);
+    }
 
-      if (!hip || !knee || !ankle) return;
+    const now = performance.now();
+    const movement = getMovementForRep(profile.kapabilitas, repsCompletedRef.current);
+    setActiveMovement(movement);
+    const reference = getReferenceMovement(movement);
+    const isSitToStand = movement === 'sit_to_stand';
+    const startsCycle = isSitToStand ? smoothedAngle <= 120 : smoothedAngle < 150;
+    const completesCycle = isSitToStand
+      ? cycleStartedRef.current && reachedStandingRef.current && smoothedAngle <= 120
+      : cycleStartedRef.current && stageRef.current === 'HOLD' && smoothedAngle >= 165;
 
-      // Compute raw knee flexion angle (180 - theta)
-      const rawAngle = calculateKneeAngle(hip, knee, ankle, side);
+    if (!cycleStartedRef.current && startsCycle) {
+      cycleStartedRef.current = true;
+      reachedStandingRef.current = false;
+      currentRepStartedAtRef.current = now;
+      currentSeriesRef.current = [previousAngle, smoothedAngle];
+      currentRepDeepestAngleRef.current = smoothedAngle;
+      stageRef.current = 'DOWN';
+    } else if (cycleStartedRef.current) {
+      currentSeriesRef.current.push(smoothedAngle);
+      currentRepDeepestAngleRef.current = Math.min(currentRepDeepestAngleRef.current, smoothedAngle);
+      if (smoothedAngle >= 165) reachedStandingRef.current = true;
+      if (!isSitToStand && smoothedAngle <= 120) stageRef.current = 'HOLD';
+      if (smoothedAngle > previousAngle) currentRepHoldFramesRef.current += 1;
+    }
 
-      // Smooth with EMA filter
-      const smoothedAngle = emaFilterRef.current.filter(rawAngle);
-
-      // Determine active zone and exercise phase
-      const zone = determineSafetyZone(smoothedAngle, profile.oaGrade);
-      const phase = determineExercisePhase(
-        smoothedAngle,
-        previousAngleRef.current,
-        profile.oaGrade
-      );
-
-      previousAngleRef.current = smoothedAngle;
-      setCurrentAngle(smoothedAngle);
-      setCurrentZone(zone);
-      setExercisePhase(phase);
-
-      if (smoothedAngle > maxFlexionReachedRef.current) {
-        maxFlexionReachedRef.current = smoothedAngle;
-        setMaxFlexionReached(smoothedAngle);
-      }
-
-      const now = performance.now();
-
-      // RED ZONE WARNING HANDLING
-      if (zone === 'RED') {
-        if (!currentRepHadRedRef.current) {
-          currentRepHadRedRef.current = true;
+    if (cycleStartedRef.current && currentSeriesRef.current.length >= 8) {
+      const similarity = calculateMovementSimilarity(currentSeriesRef.current.slice(-120), reference.angleTimeSeries);
+      setCurrentSimilarityScore(similarity.similarityScorePercent);
+      setCurrentZone(similarity.zone);
+      if (similarity.zone === 'RED') {
+        currentRepHadRedRef.current = true;
+        if (now - lastWarningTimeRef.current > 2500) {
           redZoneWarningsRef.current += 1;
           setRedZoneWarnings(redZoneWarningsRef.current);
-        }
-
-        // Throttle audio warning every 2.5 seconds to prevent audio spam
-        if (now - lastWarningTimeRef.current > 2500) {
           playWarning();
-          speak(AUDIO_PHRASES.EXERCISE.WARNING_OVER_FLEXION);
+          speak('Perhatikan bentuk gerakan dan kurangi kedalaman.');
           lastWarningTimeRef.current = now;
         }
-        setCoachMessage('⚠️ PERINGATAN: Tekukan lutut melebihi batas aman!');
+        setCoachMessage('Skor gerakan menurun. Kembali ke posisi yang nyaman.');
+      } else if (similarity.zone === 'YELLOW') {
+        setCoachMessage(`Skor kemiripan ${similarity.similarityScorePercent}%. Jaga gerakan tetap perlahan.`);
       }
+    }
 
-      // NICHOLAS RENOTTE REPETITION FSM
-      // 1. Stand / Rest position: Angle < 25°
-      if (smoothedAngle < 25.0) {
-        if (stageRef.current === 'DOWN' || stageRef.current === 'HOLD') {
-          // User just completed a squat repetition!
-          const maxRepAngle = currentRepMaxAngleRef.current;
-
-          // Only count if user performed an actual descent (at least 35° flexion)
-          if (maxRepAngle >= 35.0) {
-            const nextRepIndex = repsCompletedRef.current + 1;
-            const hadRed = currentRepHadRedRef.current;
-            const isSafe = !hadRed && maxRepAngle <= thresholds.yellowMax;
-            const holdSeconds = Math.round((currentRepHoldFramesRef.current / 30) * 10) / 10;
-            const formScore = isSafe ? (maxRepAngle >= thresholds.greenMax ? 100 : 90) : 60;
-
-            const newRecord: RepetitionRecord = {
-              repIndex: nextRepIndex,
-              maxFlexionAngle: maxRepAngle,
-              holdDurationSeconds: holdSeconds,
-              isSafeRoM: isSafe,
-              formScore,
-              timestamp: Date.now(),
-            };
-
-            repetitionRecordsRef.current.push(newRecord);
-            repsCompletedRef.current = nextRepIndex;
-            setRepsCompleted(nextRepIndex);
-
-            // Play audio feedback
-            playSuccess();
-            speak(AUDIO_PHRASES.EXERCISE.REP_SUCCESS(nextRepIndex, targetReps));
-
-            if (nextRepIndex >= targetReps) {
-              setCoachMessage('🎉 TARGET SELESAI! Sesi latihan hari ini tuntas.');
-              setTimeout(() => {
-                speak(AUDIO_PHRASES.EXERCISE.SESSION_COMPLETE);
-              }, 1200);
-            } else {
-              setCoachMessage(`Bagus! Repetisi ke-${nextRepIndex} selesai. Siap untuk berikutnya.`);
-            }
-          }
-
-          // Reset rep trackers
-          stageRef.current = 'UP';
-          currentRepMaxAngleRef.current = 0;
-          currentRepHadRedRef.current = false;
-          currentRepHoldFramesRef.current = 0;
-        } else {
-          stageRef.current = 'UP';
-          if (now - lastInstructionTimeRef.current > 4000) {
-            setCoachMessage('Kaki lurus. Tekuk lutut perlahan ke bawah.');
-            lastInstructionTimeRef.current = now;
-          }
+    if (completesCycle) {
+      if (currentSeriesRef.current.length >= 8) {
+        const nextRepIndex = repsCompletedRef.current + 1;
+        const durationMs = currentRepStartedAtRef.current ? Math.round(now - currentRepStartedAtRef.current) : undefined;
+        const similarity = currentSeriesRef.current.length >= 8
+          ? calculateMovementSimilarity(currentSeriesRef.current, reference.angleTimeSeries)
+          : { similarityScorePercent: 0, zone: 'RED' as SafetyZone };
+        const record: RepetitionRecord = {
+          repIndex: nextRepIndex,
+          maxFlexionAngle: Math.round(currentRepDeepestAngleRef.current * 10) / 10,
+          holdDurationSeconds: Math.round((currentRepHoldFramesRef.current / 30) * 10) / 10,
+          durationMs,
+          isSafeRoM: !currentRepHadRedRef.current && similarity.similarityScorePercent >= 60,
+          formScore: similarity.similarityScorePercent,
+          movementType: movement,
+          similarityScore: similarity.similarityScorePercent,
+          timestamp: Date.now(),
+        };
+        const fatigueEvaluation = fatigueTrackerRef.current.recordRepetition(record);
+        record.fatigueFlag = fatigueEvaluation.fatigueFlag;
+        if (fatigueEvaluation.fatigueFlag) {
+          setFatigueFlag(true);
+          setCoachMessage(fatigueEvaluation.reason ?? 'Indikasi kelelahan terdeteksi. Istirahat sebentar.');
         }
+        repetitionRecordsRef.current.push(record);
+        repsCompletedRef.current = nextRepIndex;
+        setRepsCompleted(nextRepIndex);
+        playSuccess();
+        speak(AUDIO_PHRASES.EXERCISE.REP_SUCCESS(nextRepIndex, targetReps));
+        if (nextRepIndex >= targetReps) setCoachMessage('Target selesai. Sesi latihan hari ini tuntas.');
+        else if (profile.kapabilitas === 'duduk_dan_berdiri' && nextRepIndex === SIT_TO_STAND_REPS) setCoachMessage('Tahap sit-to-stand selesai. Berikutnya squat bertahap.');
+        else setCoachMessage(`Bagus. Repetisi ke-${nextRepIndex} selesai.`);
       }
+      cycleStartedRef.current = false;
+      reachedStandingRef.current = false;
+      stageRef.current = 'UP';
+      currentRepDeepestAngleRef.current = 180;
+      currentRepHadRedRef.current = false;
+      currentRepHoldFramesRef.current = 0;
+      currentRepStartedAtRef.current = null;
+      currentSeriesRef.current = [];
+    }
+  }, [isFinished, playSuccess, playWarning, profile.kapabilitas, profile.targetKnee, speak, targetReps]);
 
-      // 2. Descending / Squatting down: Angle >= 30°
-      else if (smoothedAngle >= 30.0) {
-        stageRef.current = 'DOWN';
-        if (smoothedAngle > currentRepMaxAngleRef.current) {
-          currentRepMaxAngleRef.current = smoothedAngle;
-        }
-
-        // Inside optimal yellow zone (near target RoM)
-        if (zone === 'YELLOW') {
-          stageRef.current = 'HOLD';
-          currentRepHoldFramesRef.current += 1;
-          setCoachMessage(`Zona Target (${smoothedAngle}°)! Tahan sebentar lalu kembali tegak.`);
-        } else if (zone === 'GREEN') {
-          setCoachMessage(`Zona Aman (${smoothedAngle}°). Tekuk perlahan.`);
-        }
-      }
-    },
-    [isFinished, profile, targetReps, thresholds, speak, playSuccess, playWarning]
-  );
-
-  /**
-   * Finalize and compile ExerciseSessionSummary
-   */
   const finishSession = useCallback((): ExerciseSessionSummary => {
     setIsFinished(true);
     audioCoach.stopSpeaking();
-
-    const totalReps = repsCompletedRef.current;
     const records = repetitionRecordsRef.current;
-    const safeReps = records.filter((r) => r.isSafeRoM).length;
-    const avgHold = records.length
-      ? Math.round((records.reduce((acc, r) => acc + r.holdDurationSeconds, 0) / records.length) * 10) / 10
-      : 0;
-    const overallForm = records.length
-      ? Math.round(records.reduce((acc, r) => acc + r.formScore, 0) / records.length)
-      : 80;
-
-    const summary: ExerciseSessionSummary = {
+    const averageSimilarityScore = records.length ? Math.round(records.reduce((sum, record) => sum + (record.similarityScore ?? 0), 0) / records.length) : 0;
+    const overallFormScore = records.length ? Math.round(records.reduce((sum, record) => sum + record.formScore, 0) / records.length) : 0;
+    return {
       sessionId: `session_${Date.now()}`,
       date: new Date().toISOString(),
-      medicalProfile: profile,
-      totalRepsCompleted: totalReps,
-      safeRepsCompleted: safeReps,
+      userProfile: profile,
+      totalRepsCompleted: repsCompletedRef.current,
+      safeRepsCompleted: records.filter((record) => record.isSafeRoM).length,
       maxFlexionReached: Math.round(maxFlexionReachedRef.current * 10) / 10,
-      avgHoldDuration: avgHold,
+      avgHoldDuration: records.length ? Math.round(records.reduce((sum, record) => sum + record.holdDurationSeconds, 0) / records.length * 10) / 10 : 0,
       totalDurationSeconds: durationSeconds,
-      overallFormScore: overallForm,
+      overallFormScore,
+      averageSimilarityScore,
       repetitionHistory: records,
+      fatigueFlag,
     };
+  }, [audioCoach, durationSeconds, fatigueFlag, profile]);
 
-    return summary;
-  }, [audioCoach, durationSeconds, profile]);
-
-  return {
-    currentAngle,
-    currentZone,
-    exercisePhase,
-    repsCompleted,
-    targetReps,
-    redZoneWarnings,
-    maxFlexionReached,
-    coachMessage,
-    durationSeconds,
-    processFrameLandmarks,
-    finishSession,
-    audioCoach,
-  };
+  return { currentAngle, currentZone, currentSimilarityScore, exercisePhase, activeMovement, repsCompleted, targetReps, redZoneWarnings, maxFlexionReached, coachMessage, durationSeconds, fatigueFlag, processFrameLandmarks, finishSession, audioCoach };
 }

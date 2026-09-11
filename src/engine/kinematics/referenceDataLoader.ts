@@ -1,5 +1,6 @@
 import type { MovementType, ReferenceMovement } from '@/types/kinematics';
 import { GOLDEN_REFERENCE_MOVEMENTS } from '@/constants/goldenData';
+import { getSavedReferenceMovement } from './referenceStorage';
 
 /**
  * Memuat data gerakan referensi (golden data) berdasarkan tipe gerakan.
@@ -7,7 +8,7 @@ import { GOLDEN_REFERENCE_MOVEMENTS } from '@/constants/goldenData';
  * @returns Objekt ReferenceMovement
  */
 export function getReferenceMovement(type: MovementType): ReferenceMovement {
-  const movement = GOLDEN_REFERENCE_MOVEMENTS[type];
+  const movement = getSavedReferenceMovement(type) ?? GOLDEN_REFERENCE_MOVEMENTS[type];
   if (!movement) {
     throw new Error(`Data referensi untuk tipe gerakan '${type}' tidak ditemukan.`);
   }
@@ -19,7 +20,10 @@ export function getReferenceMovement(type: MovementType): ReferenceMovement {
  * @returns Array dari ReferenceMovement
  */
 export function getAllReferenceMovements(): ReferenceMovement[] {
-  return Object.values(GOLDEN_REFERENCE_MOVEMENTS);
+  return Object.keys(GOLDEN_REFERENCE_MOVEMENTS).map((type) => {
+    const movementType = type as MovementType;
+    return getSavedReferenceMovement(movementType) ?? GOLDEN_REFERENCE_MOVEMENTS[movementType];
+  });
 }
 
 /**

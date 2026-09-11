@@ -33,9 +33,9 @@ export async function initializePoseLandmarker(): Promise<PoseLandmarker> {
       },
       runningMode: 'VIDEO',
       numPoses: 1,
-      minPoseDetectionConfidence: 0.5,
-      minPosePresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      minPoseDetectionConfidence: 0.65,
+      minPosePresenceConfidence: 0.65,
+      minTrackingConfidence: 0.65,
     });
 
     return poseLandmarker;

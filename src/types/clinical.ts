@@ -1,6 +1,19 @@
 export type OAGrade = 'grade1' | 'grade2' | 'grade3';
 export type TargetKnee = 'left' | 'right' | 'both';
 
+export type CapabilityLevel = 'hanya_duduk' | 'duduk_dan_berdiri';
+export type AssistanceStatus = 'mandiri' | 'butuh_pendamping';
+
+export interface UserProfile {
+  id: string;
+  namaPanggilan: string;
+  kapabilitas: CapabilityLevel;
+  pendampingan: AssistanceStatus;
+  targetRepetisiPerSesi: number;
+  kontakKeluarga?: string;
+  targetKnee?: TargetKnee;
+}
+
 export interface MedicalProfile {
   oaGrade: OAGrade;
   painScale: number; // 1 - 10 (VAS)

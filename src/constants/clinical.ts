@@ -1,4 +1,13 @@
-import type { ClinicalSafetyLimits, OAGrade, PainBadgeConfig, TargetKnee } from '@/types/clinical';
+import type { ClinicalSafetyLimits, OAGrade, PainBadgeConfig, TargetKnee, UserProfile } from '@/types/clinical';
+
+export const DEFAULT_USER_PROFILE: UserProfile = {
+  id: 'local-user',
+  namaPanggilan: '',
+  kapabilitas: 'duduk_dan_berdiri',
+  pendampingan: 'mandiri',
+  targetRepetisiPerSesi: 6,
+  targetKnee: 'left',
+};
 
 export const DEFAULT_MEDICAL_PROFILE = {
   oaGrade: 'grade2' as OAGrade,

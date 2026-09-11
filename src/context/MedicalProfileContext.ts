@@ -1,11 +1,10 @@
 import { createContext, type Dispatch, type SetStateAction } from 'react';
-import type { MedicalProfile, ClinicalSafetyLimits } from '@/types/clinical';
+import type { UserProfile } from '@/types/clinical';
 
 export interface MedicalProfileContextValue {
-  profile: MedicalProfile;
-  safetyLimits: ClinicalSafetyLimits;
-  updateProfile: (updates: Partial<MedicalProfile>) => void;
-  setProfile: Dispatch<SetStateAction<MedicalProfile>>;
+  profile: UserProfile;
+  updateProfile: (updates: Partial<UserProfile>) => void;
+  setProfile: Dispatch<SetStateAction<UserProfile>>;
   resetProfile: () => void;
 }
 

@@ -8,12 +8,10 @@ import { AppLayout } from '@/components/layouts/AppLayout';
 import { SilhouetteGuide } from '@/components/features/calibration/SilhouetteGuide';
 import { useCamera } from '@/hooks/useCamera';
 import { useAudioCoach } from '@/hooks/useAudioCoach';
-import { useMedicalProfile } from '@/hooks/useMedicalProfile';
 import { AUDIO_PHRASES } from '@/constants/audioPhrases';
 
 export default function Calibration() {
   const navigate = useNavigate();
-  const { profile } = useMedicalProfile();
   const { videoRef, isCameraActive, cameraError, startCamera, toggleFacingMode } = useCamera({
     facingMode: 'user',
     autoStart: true,
@@ -31,7 +29,7 @@ export default function Calibration() {
 
   const handleStartExercise = () => {
     stopSpeaking();
-    navigate('/tracking', { state: profile });
+    navigate('/tracking');
   };
 
   const handleBack = () => {
@@ -125,7 +123,7 @@ export default function Calibration() {
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-4 gap-4 my-auto">
         {/* Floating Distance Badge */}
         <Badge className="bg-[#000000]/90 text-[#d1ffca] border border-[#d1ffca]/50 font-mono text-xs px-4 py-1.5 rounded-full shadow-lg backdrop-blur-md uppercase tracking-wider">
-          JARAK IDEAL: 1.5 - 2.0 METER
+          JARAK IDEAL: SEKITAR 3 METER // SUDUT 45°
         </Badge>
 
         {/* Bounding Box / Side-Profile Body Silhouette Component */}

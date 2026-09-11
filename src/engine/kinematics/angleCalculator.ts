@@ -53,6 +53,14 @@ export function calculateJointAngle3D(p1: Point3D, p2: Point3D, p3: Point3D): nu
   return Math.round(angleDeg * 10) / 10;
 }
 
+export function calculateKneeAngle3D(
+  hip: Point3D,
+  knee: Point3D,
+  ankle: Point3D
+): number {
+  return calculateJointAngle3D(hip, knee, ankle);
+}
+
 /**
  * Convenience helper specifically for Knee Flexion Angle (Hip - Knee - Ankle).
  * Calculates the flexion angle: 180 - theta, representing how much the knee is bent from straight (0°).
