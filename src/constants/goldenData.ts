@@ -39,10 +39,16 @@ function generateSmoothAngleSeries(
 
 /**
  * Golden Data Referensi 1: Sit-to-Stand (Duduk ke Berdiri)
- * - Posisi awal: Sit (fleksi 90°)
- * - Puncak ekstensi: Stand (175°)
- * - Kembali ke: Sit (fleksi 90°)
+ * - Posisi awal: Sit (fleksi ~90°)
+ * - Puncak ekstensi: Stand (fleksi ~5°, mendekati lurus)
+ * - Kembali ke: Sit (fleksi ~90°)
  * Durasi: 4 detik (120 sampel pada 30 FPS)
+ *
+ * PENTING: skala di sini adalah SKALA FLEKSI (0° = lurus sempurna, membesar
+ * seiring menekuk) — sama seperti calculateKneeAngle (2D) / calculateKneeFlexionAngle3D
+ * dan data hasil rekam ReferenceRecorder. Sebelumnya nilai di sini terbalik
+ * (90 -> 175 -> 90, skala interior lama) sehingga saat fallback ke golden data
+ * ini terpakai, perbandingan gerakan pengguna selalu salah arah total.
  */
 export const GOLDEN_DATA_SIT_TO_STAND: ReferenceMovement = {
   id: 'ref_sit_to_stand_v1',
@@ -52,7 +58,7 @@ export const GOLDEN_DATA_SIT_TO_STAND: ReferenceMovement = {
     'Gerakan referensi fisioterapi standar dari posisi duduk tegak di kursi ke berdiri lurus sempurna dan kembali duduk.',
   samplingRateHz: 30,
   totalDurationSeconds: 4.0,
-  angleTimeSeries: generateSmoothAngleSeries(90, 175, 90, 120),
+  angleTimeSeries: generateSmoothAngleSeries(90, 5, 90, 120),
   keyPhaseIndices: {
     flexionStart: 0,
     peakFlexion: 59,
@@ -62,9 +68,9 @@ export const GOLDEN_DATA_SIT_TO_STAND: ReferenceMovement = {
 
 /**
  * Golden Data Referensi 2: Squat (Berdiri ke Fleksi Bertahap)
- * - Posisi awal: Stand (175°)
- * - Puncak fleksi: Squat Aman (90°)
- * - Kembali ke: Stand (175°)
+ * - Posisi awal: Stand (fleksi ~5°, mendekati lurus)
+ * - Puncak fleksi: Squat Aman (fleksi ~90°)
+ * - Kembali ke: Stand (fleksi ~5°)
  * Durasi: 4 detik (120 sampel pada 30 FPS)
  */
 export const GOLDEN_DATA_SQUAT: ReferenceMovement = {
@@ -75,7 +81,7 @@ export const GOLDEN_DATA_SQUAT: ReferenceMovement = {
     'Gerakan referensi squat fisioterapi dari posisi berdiri tegak, fleksi lutut aman hingga 90 derajat, dan kembali ke posisi berdiri.',
   samplingRateHz: 30,
   totalDurationSeconds: 4.0,
-  angleTimeSeries: generateSmoothAngleSeries(175, 90, 175, 120),
+  angleTimeSeries: generateSmoothAngleSeries(5, 90, 5, 120),
   keyPhaseIndices: {
     flexionStart: 0,
     peakFlexion: 59,

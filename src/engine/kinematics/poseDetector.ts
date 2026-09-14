@@ -25,10 +25,13 @@ export async function initializePoseLandmarker(): Promise<PoseLandmarker> {
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm'
     );
 
-    // Membuat instance PoseLandmarker dengan model Lite untuk performa tinggi di Edge AI
+    // Model "Full" dipakai (bukan "Lite") karena delegate GPU sudah aktif —
+    // GPU (mis. RTX via WebGL) sanggup menangani akurasi lebih tinggi tanpa
+    // drop FPS signifikan, dan akurasi landmark adalah plafon tertinggi untuk
+    // semua perhitungan sudut/oklusi di lapisan atas.
     poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
         delegate: 'GPU',
       },
       runningMode: 'VIDEO',

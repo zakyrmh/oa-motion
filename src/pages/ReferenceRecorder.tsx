@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { useCamera } from '@/hooks/useCamera';
 import { usePoseTracking } from '@/hooks/usePoseTracking';
-import { calculateKneeAngle3D } from '@/engine/kinematics/angleCalculator';
+import { calculateAnkleAngle, calculateKneeAngle } from '@/engine/kinematics/angleCalculator';
 import { EMAFilter } from '@/engine/kinematics/emaFilter';
 import { saveReferenceMovement } from '@/engine/kinematics/referenceStorage';
 import { getReferenceRole, hasReferenceRecorderAccess } from '@/engine/kinematics/referenceAccess';
@@ -52,11 +52,14 @@ export default function ReferenceRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [sampleCount, setSampleCount] = useState(0);
+  const [liveKneeAngle, setLiveKneeAngle] = useState<number | null>(null);
+  const [liveAnkleAngle, setLiveAnkleAngle] = useState<number | null>(null);
   const [lastRecording, setLastRecording] = useState<ReferenceMovement | null>(null);
   const [statusMessage, setStatusMessage] = useState('Siapkan satu repetisi gerakan di depan kamera.');
   const samplesRef = useRef<number[]>([]);
   const recordingStartedAtRef = useRef(0);
-  const angleFilterRef = useRef(new EMAFilter(0.25));
+  const kneeFilterRef = useRef(new EMAFilter(0.25));
+  const ankleFilterRef = useRef(new EMAFilter(0.25));
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const {
     videoRef,
@@ -67,12 +70,14 @@ export default function ReferenceRecorder() {
     toggleFacingMode,
   } = useCamera({ facingMode: 'user', autoStart: true });
 
-  const drawOverlay = useCallback((frame: SmoothedPoseFrame) => {
+  const drawOverlay = useCallback((frame: SmoothedPoseFrame, kneeAngle: number, ankleAngle: number) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video || frame.imageLandmarks.length < 33) return;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+    }
     const context = canvas.getContext('2d');
     if (!context) return;
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -83,6 +88,7 @@ export default function ReferenceRecorder() {
     const hip = point(23);
     const knee = point(25);
     const ankle = point(27);
+    const foot = point(31);
     context.beginPath();
     context.moveTo(hip.x, hip.y);
     context.lineTo(knee.x, knee.y);
@@ -91,30 +97,106 @@ export default function ReferenceRecorder() {
     context.lineWidth = 8;
     context.lineCap = 'round';
     context.stroke();
-    context.fillStyle = '#fff100';
-    context.strokeStyle = '#000000';
-    context.lineWidth = 3;
     context.beginPath();
-    context.arc(knee.x, knee.y, 14, 0, Math.PI * 2);
-    context.fill();
+    context.moveTo(ankle.x, ankle.y);
+    context.lineTo(foot.x, foot.y);
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 5;
     context.stroke();
+
+    const drawNode = (node: { x: number; y: number }, radius: number, fill: string) => {
+      context.beginPath();
+      context.arc(node.x, node.y, radius, 0, Math.PI * 2);
+      context.fillStyle = fill;
+      context.fill();
+      context.lineWidth = 2;
+      context.strokeStyle = '#000000';
+      context.stroke();
+    };
+
+    drawNode(hip, 8, '#ffffff');
+    drawNode(ankle, 10, '#ffffff');
+    drawNode(foot, 8, '#fff100');
+    drawNode(knee, 14, '#d1ffca');
+
+    const drawTag = (node: { x: number; y: number }, text: string, color: string) => {
+      context.font = 'bold 14px monospace';
+      const tagWidth = context.measureText(text).width + 18;
+      const tagHeight = 26;
+      const tagX = Math.min(canvas.width - tagWidth - 8, Math.max(8, node.x + 16));
+      const tagY = Math.min(canvas.height - tagHeight - 8, Math.max(8, node.y - 14));
+      context.fillStyle = '#000000';
+      context.beginPath();
+      context.roundRect(tagX, tagY, tagWidth, tagHeight, 13);
+      context.fill();
+      context.lineWidth = 2;
+      context.strokeStyle = color;
+      context.stroke();
+      context.fillStyle = color;
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(text, tagX + tagWidth / 2, tagY + tagHeight / 2);
+    };
+
+    drawTag(knee, `LUTUT ${Math.round(kneeAngle)}°`, '#d1ffca');
+    drawTag(ankle, `ANKLE ${Math.round(ankleAngle)}°`, '#fff100');
   }, [videoRef]);
 
   const handlePoseResults = useCallback((frame: SmoothedPoseFrame) => {
-    drawOverlay(frame);
-    if (!isRecording) return;
     const hipIndex = 23;
     const kneeIndex = 25;
     const ankleIndex = 27;
-    const hip = frame.worldLandmarks[hipIndex];
-    const knee = frame.worldLandmarks[kneeIndex];
-    const ankle = frame.worldLandmarks[ankleIndex];
-    if (!hip || !knee || !ankle) return;
-    const angle = angleFilterRef.current.filter(calculateKneeAngle3D(hip, knee, ankle));
-    samplesRef.current.push(angle);
-    setSampleCount(samplesRef.current.length);
+    const footIndex = 31;
+    const video = videoRef.current;
+    // imageLandmarks dari MediaPipe dinormalisasi 0-1 secara TERPISAH untuk x
+    // dan y. Karena video 16:9 (mis. 1280x720), 1 unit-x != 1 unit-y secara
+    // fisik. Menghitung sudut langsung dari nilai ternormalisasi akan
+    // mendistorsi hasil tergantung orientasi kaki di frame. Maka di sini
+    // dikonversi dulu ke ruang piksel asli (isotropik) sebelum dipakai.
+    const width = video?.videoWidth || 1;
+    const height = video?.videoHeight || 1;
+    const toPixelSpace = (landmark: typeof frame.imageLandmarks[number] | undefined) =>
+      landmark ? { x: landmark.x * width, y: landmark.y * height, visibility: landmark.visibility } : undefined;
+
+    const hip = toPixelSpace(frame.imageLandmarks[hipIndex]);
+    const knee = toPixelSpace(frame.imageLandmarks[kneeIndex]);
+    const ankle = toPixelSpace(frame.imageLandmarks[ankleIndex]);
+    const foot = toPixelSpace(frame.imageLandmarks[footIndex]);
+    if (!hip || !knee || !ankle || !foot) return;
+
+    // calculateKneeAngle sudah menangani: (a) validasi visibility hip/ankle,
+    // (b) estimasi posisi lutut saat oklusi memakai kalibrasi panjang tungkai.
+    const rawKneeAngle = calculateKneeAngle(hip, knee, ankle, 'left');
+    const rawAnkleAngle = calculateAnkleAngle(knee, ankle, foot);
+
+    // Kalau lutut gagal terdeteksi dengan valid pada frame ini, jangan timpa
+    // dengan nilai 0 — pertahankan angka terakhir yang valid di layar, dan
+    // jangan ikut memasukkan sampel yang salah ke rekaman.
+    let filteredKnee = kneeFilterRef.current.get();
+    if (rawKneeAngle !== null) {
+      filteredKnee = kneeFilterRef.current.filter(rawKneeAngle);
+      setLiveKneeAngle(filteredKnee);
+    }
+
+    let filteredAnkle = ankleFilterRef.current.get();
+    if (rawAnkleAngle !== null) {
+      filteredAnkle = ankleFilterRef.current.filter(rawAnkleAngle);
+      setLiveAnkleAngle(filteredAnkle);
+    }
+
+    if (filteredKnee !== null && filteredAnkle !== null) {
+      drawOverlay(frame, filteredKnee, filteredAnkle);
+    }
+
+    if (!isRecording) return;
+    // Hanya rekam sampel saat kedua sudut valid pada frame ini, supaya
+    // deretan waktu (angleTimeSeries) tidak tercemar 0°/nilai basi.
+    if (rawKneeAngle !== null && filteredKnee !== null) {
+      samplesRef.current.push(filteredKnee);
+      setSampleCount(samplesRef.current.length);
+    }
     setElapsedMs(performance.now() - recordingStartedAtRef.current);
-  }, [drawOverlay, isRecording]);
+  }, [drawOverlay, isRecording, videoRef]);
 
   const { isLoading: isModelLoading, error: modelError } = usePoseTracking(videoRef, {
     onResults: handlePoseResults,
@@ -131,7 +213,8 @@ export default function ReferenceRecorder() {
 
   const startRecording = () => {
     samplesRef.current = [];
-    angleFilterRef.current.reset();
+    kneeFilterRef.current.reset();
+    ankleFilterRef.current.reset();
     recordingStartedAtRef.current = performance.now();
     setElapsedMs(0);
     setSampleCount(0);
@@ -206,7 +289,7 @@ export default function ReferenceRecorder() {
 
         <Card className="flex flex-col gap-4 rounded-3xl border-2 border-white/20 bg-[#f3f3f3] p-5 text-black shadow-none">
           <div className="grid gap-3 sm:grid-cols-2"><label className="flex flex-col gap-2 text-sm font-bold uppercase">Jenis gerakan<select value={movementType} onChange={(event) => setMovementType(event.target.value as MovementType)} className="h-12 rounded-xl border-2 border-black bg-white px-3 text-base normal-case outline-none"><option value="sit_to_stand">Sit-to-Stand</option><option value="squat">Squat</option></select></label><label className="flex flex-col gap-2 text-sm font-bold uppercase">Nama referensi<input value={movementName} onChange={(event) => setMovementName(event.target.value)} className="h-12 rounded-xl border-2 border-black bg-white px-3 text-base normal-case outline-none" /></label></div>
-          <div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">SAMPEL</span><strong className="font-mono text-xl">{sampleCount}</strong></div><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">DURASI</span><strong className="font-mono text-xl">{(elapsedMs / 1000).toFixed(1)}s</strong></div><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">STATUS</span><strong className="font-mono text-xl">{lastRecording ? 'SIAP' : isRecording ? 'LIVE' : '-'}</strong></div></div>
+          <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-5"><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">LUTUT</span><strong className="font-mono text-xl">{liveKneeAngle === null ? '--' : `${Math.round(liveKneeAngle)}°`}</strong></div><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">ANKLE</span><strong className="font-mono text-xl">{liveAnkleAngle === null ? '--' : `${Math.round(liveAnkleAngle)}°`}</strong></div><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">SAMPEL</span><strong className="font-mono text-xl">{sampleCount}</strong></div><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">DURASI</span><strong className="font-mono text-xl">{(elapsedMs / 1000).toFixed(1)}s</strong></div><div className="rounded-xl bg-white p-3"><span className="block font-mono text-[10px] font-bold text-[#777]">STATUS</span><strong className="font-mono text-xl">{lastRecording ? 'SIAP' : isRecording ? 'LIVE' : '-'}</strong></div></div>
           <p className="text-sm font-semibold text-[#444444]">{statusMessage}</p>
           {!isRecording ? <Button onClick={startRecording} disabled={!isCameraActive || isModelLoading} className="h-14 rounded-2xl bg-black text-base font-black uppercase text-white shadow-none"><Play className="mr-2 size-5 text-[#d1ffca]" /> Mulai rekam</Button> : <Button onClick={stopRecording} className="h-14 rounded-2xl bg-[#EF4444] text-base font-black uppercase text-white shadow-none"><Square className="mr-2 size-5 fill-white" /> Hentikan rekaman</Button>}
           {lastRecording && <div className="grid gap-3 sm:grid-cols-2"><Button onClick={saveRecording} className="h-12 rounded-2xl bg-[#d1ffca] font-bold uppercase text-black shadow-none"><Save className="mr-2 size-5" /> Simpan untuk tracking</Button><Button onClick={downloadRecording} variant="outline" className="h-12 rounded-2xl border-2 border-black bg-white font-bold uppercase text-black shadow-none"><Download className="mr-2 size-5" /> Unduh JSON</Button></div>}

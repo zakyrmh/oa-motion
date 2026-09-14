@@ -3,7 +3,7 @@ import type { UserProfile, SafetyZone } from '@/types/clinical';
 import type { ExercisePhase, Point3D, MovementType } from '@/types/kinematics';
 import type { RepetitionRecord, ExerciseSessionSummary } from '@/types/session';
 import { AUDIO_PHRASES } from '@/constants/audioPhrases';
-import { calculateKneeAngle3D } from '@/engine/kinematics/angleCalculator';
+import { calculateKneeFlexionAngle3D } from '@/engine/kinematics/angleCalculator';
 import { EMAFilter } from '@/engine/kinematics/emaFilter';
 import { calculateMovementSimilarity } from '@/engine/kinematics/dtwCalculator';
 import { getReferenceMovement } from '@/engine/kinematics/referenceDataLoader';
@@ -40,9 +40,9 @@ export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
   const [isFinished, setIsFinished] = useState(false);
 
   const emaFilterRef = useRef(new EMAFilter(0.25));
-  const previousAngleRef = useRef(180);
+  const previousAngleRef = useRef(0);
   const stageRef = useRef<'UP' | 'DOWN' | 'HOLD'>('UP');
-  const currentRepDeepestAngleRef = useRef(180);
+  const currentRepDeepestAngleRef = useRef(0);
   const currentRepHadRedRef = useRef(false);
   const currentRepHoldFramesRef = useRef(0);
   const currentRepStartedAtRef = useRef<number | null>(null);
@@ -77,14 +77,14 @@ export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
     const ankle = landmarks[ankleIndex];
     if (!hip || !knee || !ankle) return;
 
-    const smoothedAngle = emaFilterRef.current.filter(calculateKneeAngle3D(hip, knee, ankle));
+    const smoothedAngle = emaFilterRef.current.filter(calculateKneeFlexionAngle3D(hip, knee, ankle));
     const previousAngle = previousAngleRef.current;
     previousAngleRef.current = smoothedAngle;
     setCurrentAngle(smoothedAngle);
     const phase: ExercisePhase = smoothedAngle < 25 ? 'REST' : smoothedAngle >= 30 ? 'FLEXION' : 'EXTENSION';
     setExercisePhase(phase);
 
-    if (smoothedAngle < maxFlexionReachedRef.current || maxFlexionReachedRef.current === 0) {
+    if (smoothedAngle > maxFlexionReachedRef.current) {
       maxFlexionReachedRef.current = smoothedAngle;
       setMaxFlexionReached(smoothedAngle);
     }
@@ -94,10 +94,10 @@ export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
     setActiveMovement(movement);
     const reference = getReferenceMovement(movement);
     const isSitToStand = movement === 'sit_to_stand';
-    const startsCycle = isSitToStand ? smoothedAngle <= 120 : smoothedAngle < 150;
+    const startsCycle = isSitToStand ? smoothedAngle >= 60 : smoothedAngle > 30;
     const completesCycle = isSitToStand
-      ? cycleStartedRef.current && reachedStandingRef.current && smoothedAngle <= 120
-      : cycleStartedRef.current && stageRef.current === 'HOLD' && smoothedAngle >= 165;
+      ? cycleStartedRef.current && reachedStandingRef.current && smoothedAngle >= 60
+      : cycleStartedRef.current && stageRef.current === 'HOLD' && smoothedAngle <= 15;
 
     if (!cycleStartedRef.current && startsCycle) {
       cycleStartedRef.current = true;
@@ -108,10 +108,10 @@ export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
       stageRef.current = 'DOWN';
     } else if (cycleStartedRef.current) {
       currentSeriesRef.current.push(smoothedAngle);
-      currentRepDeepestAngleRef.current = Math.min(currentRepDeepestAngleRef.current, smoothedAngle);
-      if (smoothedAngle >= 165) reachedStandingRef.current = true;
-      if (!isSitToStand && smoothedAngle <= 120) stageRef.current = 'HOLD';
-      if (smoothedAngle > previousAngle) currentRepHoldFramesRef.current += 1;
+      currentRepDeepestAngleRef.current = Math.max(currentRepDeepestAngleRef.current, smoothedAngle);
+      if (smoothedAngle <= 15) reachedStandingRef.current = true;
+      if (!isSitToStand && smoothedAngle >= 60) stageRef.current = 'HOLD';
+      if (smoothedAngle < previousAngle) currentRepHoldFramesRef.current += 1;
     }
 
     if (cycleStartedRef.current && currentSeriesRef.current.length >= 8) {
@@ -169,7 +169,7 @@ export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
       cycleStartedRef.current = false;
       reachedStandingRef.current = false;
       stageRef.current = 'UP';
-      currentRepDeepestAngleRef.current = 180;
+      currentRepDeepestAngleRef.current = 0;
       currentRepHadRedRef.current = false;
       currentRepHoldFramesRef.current = 0;
       currentRepStartedAtRef.current = null;
