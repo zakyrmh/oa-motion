@@ -151,6 +151,12 @@ export default function Home() {
             })}
           </div>
 
+          <div className="p-3.5 bg-[#d1ffca] rounded-2xl border border-[#000000] text-xs text-[#000000] font-medium">
+            <strong>Arti sudut fleksi:</strong> berdiri tegak = 0°, sudut siku-siku = 90°,
+            sedangkan 100° berarti lutut menekuk lebih dalam dari siku-siku. Angka ini bukan
+            sudut internal antara paha dan betis.
+          </div>
+
           {/* Grade 4 Exclusion Notice Callout */}
           <div className="p-3.5 bg-[#f3f3f3] rounded-2xl border border-[#c6c6c6] flex items-center gap-2.5 text-xs text-[#444444] font-medium">
             <AlertTriangle className="size-4 text-[#000000] shrink-0" />

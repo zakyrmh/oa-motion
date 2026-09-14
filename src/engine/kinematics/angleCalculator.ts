@@ -60,9 +60,9 @@ export function calculateJointAngle3D(p1: Point3D, p2: Point3D, p3: Point3D): nu
  * in case of clothing occlusion using previously calibrated leg segment lengths.
  */
 export function calculateKneeAngle(
-  hip: Point2D,
-  knee: Point2D,
-  ankle: Point2D,
+  hip: Point3D,
+  knee: Point3D,
+  ankle: Point3D,
   side: 'left' | 'right' = 'left'
 ): number {
   // Validasi visibilitas dasar untuk Hip dan Ankle
@@ -87,7 +87,12 @@ export function calculateKneeAngle(
     updateLegMeasurements(hip, knee, ankle, side);
   }
 
-  const interiorAngle = calculateJointAngle2D(hip, activeKnee, ankle);
+  const hasDepthCoordinates = [hip, activeKnee, ankle].every(
+    (point) => point.z !== undefined && Number.isFinite(point.z)
+  );
+  const interiorAngle = hasDepthCoordinates
+    ? calculateJointAngle3D(hip, activeKnee, ankle)
+    : calculateJointAngle2D(hip, activeKnee, ankle);
   
   // Normalisasi sudut fleksi: Flexion Angle = 180 - interiorAngle
   const flexionAngle = 180 - interiorAngle;

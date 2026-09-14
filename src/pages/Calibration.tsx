@@ -1,25 +1,122 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Volume2, VolumeX, CheckCircle2, AudioLines, RefreshCw } from 'lucide-react';
+import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { SilhouetteGuide } from '@/components/features/calibration/SilhouetteGuide';
+import { calculateKneeAngle } from '@/engine/kinematics/angleCalculator';
 import { useCamera } from '@/hooks/useCamera';
 import { useAudioCoach } from '@/hooks/useAudioCoach';
 import { useMedicalProfile } from '@/hooks/useMedicalProfile';
+import { usePoseTracking } from '@/hooks/usePoseTracking';
 import { AUDIO_PHRASES } from '@/constants/audioPhrases';
 
 export default function Calibration() {
   const navigate = useNavigate();
   const { profile } = useMedicalProfile();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { videoRef, isCameraActive, cameraError, startCamera, toggleFacingMode } = useCamera({
     facingMode: 'user',
     autoStart: true,
   });
 
   const { isMuted, toggleMute, speak, stopSpeaking } = useAudioCoach(false);
+
+  const drawLegOverlay = useCallback(
+    (landmarks: Array<{ x: number; y: number; z?: number }>) => {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      if (!canvas || !video) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+      if (landmarks.length < 33) return;
+
+      const toScreen = (point: { x: number; y: number }) => ({
+        x: (1 - point.x) * width,
+        y: point.y * height,
+      });
+
+      const drawLeg = (side: 'left' | 'right', hipIndex: number, kneeIndex: number, ankleIndex: number) => {
+        const hip = landmarks[hipIndex];
+        const knee = landmarks[kneeIndex];
+        const ankle = landmarks[ankleIndex];
+        if (!hip || !knee || !ankle) return;
+
+        const hipScreen = toScreen(hip);
+        const kneeScreen = toScreen(knee);
+        const ankleScreen = toScreen(ankle);
+        const angle = calculateKneeAngle(hip, knee, ankle, side);
+        const label = `FLEKSI LUTUT ${side === 'left' ? 'KIRI' : 'KANAN'}: ${Math.round(angle)}°`;
+
+        ctx.beginPath();
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#d1ffca';
+        ctx.moveTo(hipScreen.x, hipScreen.y);
+        ctx.lineTo(kneeScreen.x, kneeScreen.y);
+        ctx.lineTo(ankleScreen.x, ankleScreen.y);
+        ctx.stroke();
+
+        [hipScreen, ankleScreen].forEach((point) => {
+          ctx.beginPath();
+          ctx.fillStyle = '#ffffff';
+          ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.beginPath();
+        ctx.fillStyle = '#fff100';
+        ctx.arc(kneeScreen.x, kneeScreen.y, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+
+        ctx.font = 'bold 14px monospace';
+        const labelWidth = ctx.measureText(label).width + 18;
+        const labelX = Math.min(width - labelWidth - 10, Math.max(10, kneeScreen.x + 16));
+        const labelY = Math.min(height - 30, Math.max(10, kneeScreen.y - 15));
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.roundRect(labelX, labelY, labelWidth, 30, 15);
+        ctx.fill();
+        ctx.fillStyle = '#d1ffca';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, labelX + labelWidth / 2, labelY + 15);
+      };
+
+      if (profile.targetKnee === 'left' || profile.targetKnee === 'both') {
+        drawLeg('left', 23, 25, 27);
+      }
+      if (profile.targetKnee === 'right' || profile.targetKnee === 'both') {
+        drawLeg('right', 24, 26, 28);
+      }
+    },
+    [profile.targetKnee, videoRef]
+  );
+
+  const handlePoseResults = useCallback(
+    (result: PoseLandmarkerResult) => {
+      drawLegOverlay(result.landmarks?.[0] ?? []);
+    },
+    [drawLegOverlay]
+  );
+
+  const { isLoading: isPoseLoading } = usePoseTracking(videoRef, {
+    onResults: handlePoseResults,
+    enabled: isCameraActive,
+  });
 
   // Trigger spoken instruction upon entering calibration
   useEffect(() => {
@@ -72,6 +169,12 @@ export default function Calibration() {
             )}
           </div>
         )}
+
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 z-10 w-full h-full object-cover pointer-events-none"
+          aria-label="Preview tracking sudut lutut"
+        />
 
         {/* Soft Dark Vignette Overlay */}
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.85)_100%)]" />
@@ -136,6 +239,11 @@ export default function Calibration() {
           <CheckCircle2 className="size-4 text-[#000000] fill-[#d1ffca]" />
           POSISI KAMERA SUDAH PAS
         </Badge>
+        {isPoseLoading && (
+          <Badge className="bg-[#000000]/90 text-[#ffffff] border border-white/20 font-mono text-xs px-4 py-1.5 rounded-full shadow-lg uppercase tracking-wider">
+            MEMUAT TRACKING POSE...
+          </Badge>
+        )}
       </main>
 
       {/* Lower-Middle Floating Instruction Card & Bottom CTA */}
