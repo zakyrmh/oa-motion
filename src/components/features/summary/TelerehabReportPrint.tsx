@@ -63,6 +63,12 @@ export function TelerehabReportPrint({ sessionSummary }: TelerehabReportPrintPro
               <tr>
                 <td className="text-gray-600 py-0.5">Sisi Lutut Target:</td>
                 <td className="font-bold text-black py-0.5">
+                  {profile.targetKnee === 'right' ? 'Lutut Kanan' : profile.targetKnee === 'both' ? 'Kedua Lutut' : 'Lutut Kiri'}
+                </td>
+              </tr>
+              <tr>
+                <td className="text-gray-600 py-0.5">Kapabilitas Gerak:</td>
+                <td className="font-bold text-black py-0.5">
                   {profile.kapabilitas === 'hanya_duduk' ? 'Hanya duduk' : 'Duduk dan berdiri'}
                 </td>
               </tr>

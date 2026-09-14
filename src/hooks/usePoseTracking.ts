@@ -95,10 +95,9 @@ export function usePoseTracking(
             if (imageLandmarks && worldLandmarks) {
               const smoothed = landmarkSmootherRef.current.filter(
                 imageLandmarks,
-                worldLandmarks,
-                [11, 23, 25, 27, 31]
+                worldLandmarks
               );
-              if (smoothed) onResults({ ...smoothed, timestamp });
+              onResults(smoothed ? { ...smoothed, timestamp } : { imageLandmarks, worldLandmarks, timestamp });
             }
             lastVideoTimeRef.current = currentTime;
           } catch (err) {

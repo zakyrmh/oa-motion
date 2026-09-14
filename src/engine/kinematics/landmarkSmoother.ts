@@ -37,18 +37,11 @@ export class LandmarkSmoother {
 
   public filter(
     imageLandmarks: Point2D[],
-    worldLandmarks: Point3D[],
-    requiredIndices: number[]
+    worldLandmarks: Point3D[]
   ): { imageLandmarks: Point2D[]; worldLandmarks: Point3D[] } | null {
     if (imageLandmarks.length < 33 || worldLandmarks.length < 33) return null;
 
-    const requiredLandmarks = requiredIndices.map((index) => ({
-      image: imageLandmarks[index],
-      world: worldLandmarks[index],
-    }));
-    if (requiredLandmarks.some(({ image, world }) => !image || !world || !isConfident(image) || !isConfident(world))) {
-      return null;
-    }
+
 
     const smoothedImage = imageLandmarks.map((landmark, index) => {
       if (!isConfident(landmark) && this.previousImage[index]) return this.previousImage[index];
