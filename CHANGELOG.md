@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added physiological golden-data v2 generator (`generatePhysiologicalSeries`) with eccentric transition, 20-frame isometric hold plateau with micro-variation, and concentric return; sit-to-stand retuned to 85°→5°→85° and OA-safe squat to 5°→72°→5° (`ref_*_v2`).
+- Added `scripts/extract_golden_data.py` CLI to extract `ReferenceMovement` angle time series from physiotherapist video or webcam via MediaPipe Pose with peak-flexion detection and JSON export.
+- Added 5-second countdown overlay with cancel, automatic single-repetition auto-stop detection (squat and sit-to-stand), and audio coach cues (`speak`, `playTick`, `playSuccess`) in `ReferenceRecorder`.
+- Expanded `ReferenceRecorder` live metrics panel (knee/ankle angle, sample count, duration, status) and status-message card plus save-for-tracking confirmation flow.
+- Split repetition FSM in `useExerciseTracking` per movement type (sit-to-stand: sit ≥60° → stand ≤20° → sit ≥60°; squat: stand → flex ≥25° with ≥30° depth → stand ≤20°) with capability-based movement selection and target-aware coach messaging.
+- Added real-time clinical safety zoning in `useExerciseTracking` via `determineSafetyZone`/`determineExercisePhase` (`rulesEngine`) with RED-zone audio/haptic warnings and 2.5s throttle.
+- Updated `/tracking` safety banner copy to report live flexion angle against physiotherapy limits instead of similarity-only messaging; flexion card now surfaces live angle as primary metric with similarity as secondary.
+
 - Added the v2 `UserProfile` contract with capability-based setup, assistance status, repetition target, and optional family contact (T-025).
 - Refactored Home, Tracking, Summary, and printable reporting flows for the v2 profile model, two-stage movement progression, DTW/NCC similarity scoring, adaptive fatigue flagging, and family sharing (T-026 to T-028).
 - Added safe localStorage fallback for profiles that still contain the retired medical-grade schema.
@@ -58,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added path alias (`@/*`) configuration in `vite.config.ts`, `tsconfig.json`, and `tsconfig.app.json`.
 
 ### Fixed
+
+- Fixed `referenceAccess` to default to `sports_expert` role and open recorder access so golden-data recording works without server-side role injection.
+- Fixed squat hold-frame counting to use near-static detection (≥35° with <1.0° delta) and lowered safe-rep similarity threshold to 50% for OA-safe range.
+- Removed 3-rep sit-to-stand staging (`SIT_TO_STAND_REPS`); movement is now selected purely by capability (`hanya_duduk` → sit-to-stand, else squat).
 
 - Stabilized MediaPipe pose tracking by gating landmarks with visibility and optional presence scores, smoothing image/world landmarks before rendering or kinematics, and calculating knee flexion from smoothed 3D world landmarks.
 - Raised video pose detection confidence thresholds and kept the `VIDEO` running mode with monotonic frame timestamps for webcam inference.

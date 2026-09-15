@@ -79,11 +79,12 @@ export default function Tracking() {
 
       if (!landmarks || landmarks.length < 33) return;
 
-      const shoulderIdx = 11;
-      const hipIdx = 23;
-      const kneeIdx = 25;
-      const ankleIdx = 27;
-      const footIdx = 31;
+      const side = profile.targetKnee === 'right' ? 'right' : 'left';
+      const shoulderIdx = side === 'right' ? 12 : 11;
+      const hipIdx = side === 'right' ? 24 : 23;
+      const kneeIdx = side === 'right' ? 26 : 25;
+      const ankleIdx = side === 'right' ? 28 : 27;
+      const footIdx = side === 'right' ? 32 : 31;
 
       // Coordinate mapping with horizontal mirroring to match selfie preview
       const toScreen = (pt: { x: number; y: number }) => ({
@@ -116,84 +117,79 @@ export default function Tracking() {
       ctx.lineTo(hip.x, hip.y);
       ctx.stroke();
 
-      // 2. Draw Leg Vectors (Hip -> Knee -> Ankle)
+      // 2. Draw Leg segment (Hip -> Knee -> Ankle -> Foot)
       ctx.beginPath();
       ctx.lineWidth = 8;
-      ctx.strokeStyle = zoneColor;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      ctx.strokeStyle = zoneColor;
       ctx.shadowColor = glowColor;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 15;
 
       ctx.moveTo(hip.x, hip.y);
       ctx.lineTo(knee.x, knee.y);
       ctx.lineTo(ankle.x, ankle.y);
-      ctx.stroke();
-
-      // Reset shadow
-      ctx.shadowBlur = 0;
-
-      // 3. Draw Foot connector
-      ctx.beginPath();
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.moveTo(ankle.x, ankle.y);
       ctx.lineTo(foot.x, foot.y);
       ctx.stroke();
 
-      // 4. Draw Joint Nodes
-      // Hip
-      ctx.beginPath();
-      ctx.arc(hip.x, hip.y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#000000';
-      ctx.stroke();
+      // Reset canvas shadow after main lines
+      ctx.shadowBlur = 0;
 
-      // Ankle
-      ctx.beginPath();
-      ctx.arc(ankle.x, ankle.y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#000000';
-      ctx.stroke();
+      // 3. Draw Joint Nodes
+      [hip, ankle, foot].forEach((node) => {
+        ctx.beginPath();
+        ctx.fillStyle = '#ffffff';
+        ctx.arc(node.x, node.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000000';
+        ctx.stroke();
+      });
 
-      // Knee (Highlighted Spotter Vertex)
+      // Highlight target Knee Node with glowing badge
       ctx.beginPath();
-      ctx.arc(knee.x, knee.y, 14, 0, Math.PI * 2);
       ctx.fillStyle = zoneColor;
+      ctx.arc(knee.x, knee.y, 13, 0, Math.PI * 2);
       ctx.fill();
       ctx.lineWidth = 3;
       ctx.strokeStyle = '#000000';
       ctx.stroke();
 
-      // 5. Draw Angle Bubble Tag near knee joint
+      // Inner dot inside knee node
+      ctx.beginPath();
+      ctx.fillStyle = '#000000';
+      ctx.arc(knee.x, knee.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4. Floating Angle Badge beside knee joint
       const angleText = `${Math.round(currentAngle)}°`;
-      ctx.font = 'bold 16px monospace';
+      ctx.font = '900 16px Inter, sans-serif';
       const textMetrics = ctx.measureText(angleText);
       const tagW = textMetrics.width + 20;
-      const tagH = 30;
-      const tagX = Math.min(w - tagW - 10, Math.max(10, knee.x + 18));
-      const tagY = Math.min(h - tagH - 10, Math.max(10, knee.y - 15));
+      const tagH = 32;
 
-      // Bubble Background
+      // Position badge slightly offset to the right/left of knee
+      const tagX = Math.min(w - tagW - 10, Math.max(10, knee.x + 20));
+      const tagY = Math.min(h - tagH - 10, Math.max(10, knee.y - 16));
+
+      // Draw Badge background pill
       ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.roundRect(tagX, tagY, tagW, tagH, 15);
+      ctx.roundRect(tagX, tagY, tagW, tagH, 16);
       ctx.fill();
+
+      // Draw Badge Border in Zone Color
       ctx.lineWidth = 2;
       ctx.strokeStyle = zoneColor;
       ctx.stroke();
 
-      // Bubble Text
+      // Draw Badge Angle Text
       ctx.fillStyle = zoneColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(angleText, tagX + tagW / 2, tagY + tagH / 2);
     },
-    [currentAngle, currentZone, videoRef]
+    [currentAngle, currentZone, profile.targetKnee, videoRef]
   );
 
   // Frame results callback from MediaPipe Pose Tracking
@@ -239,24 +235,24 @@ export default function Tracking() {
     switch (currentZone) {
       case 'GREEN':
         return {
-          title: 'ZONA HIJAU // GERAKAN SERASI',
-          desc: `Skor kemiripan ${currentSimilarityScore}%. Gerakan terkontrol.`,
+          title: 'ZONA HIJAU // RENTANG AMAN',
+          desc: `Sudut fleksi ${Math.round(currentAngle)}°. Berada dalam batas aman fisioterapi.`,
           bg: 'bg-[#d1ffca] text-[#000000]',
           border: 'border-[#d1ffca]',
           icon: <Activity className="size-5 text-[#000000]" />,
         };
       case 'YELLOW':
         return {
-          title: 'ZONA KUNING // PERLU DISESUAIKAN',
-          desc: `Skor kemiripan ${currentSimilarityScore}%. Perlambat dan ikuti pola referensi.`,
+          title: 'ZONA KUNING // MENDEKATI BATAS MAKSIMAL',
+          desc: `Sudut fleksi ${Math.round(currentAngle)}°. Tahan sejenak lalu luruskan kembali perlahan.`,
           bg: 'bg-[#fff100] text-[#000000]',
           border: 'border-[#fff100]',
           icon: <AlertTriangle className="size-5 text-[#000000]" />,
         };
       case 'RED':
         return {
-          title: 'ZONA MERAH // HENTIKAN SEMENTARA',
-          desc: `Skor kemiripan ${currentSimilarityScore}%. Kembali ke posisi nyaman.`,
+          title: 'ZONA MERAH // MELEBIHI BATAS AMAN',
+          desc: `Sudut fleksi ${Math.round(currentAngle)}°. Lutut menekuk terlalu dalam, segera kurangi kedalaman!`,
           bg: 'bg-[#EF4444] text-[#ffffff] animate-pulse',
           border: 'border-[#DC2626]',
           icon: <ShieldAlert className="size-5 text-[#ffffff]" />,
@@ -328,6 +324,7 @@ export default function Tracking() {
             LANGKAH 3 DARI 3: LATIHAN
           </Badge>
           <span className="font-mono text-xs text-white/80 font-semibold uppercase hidden sm:inline">
+            {profile.targetKnee === 'right' ? 'LUTUT KANAN' : profile.targetKnee === 'both' ? 'KEDUA LUTUT' : 'LUTUT KIRI'} •{' '}
             {activeMovement === 'sit_to_stand' ? 'TAHAP SIT-TO-STAND' : 'TAHAP SQUAT'} •{' '}
             {profile.pendampingan === 'mandiri' ? 'MODE MANDIRI' : 'DENGAN PENDAMPING'}
           </span>
@@ -404,7 +401,7 @@ export default function Tracking() {
             </div>
           </div>
 
-          {/* Card 2: Real-time Flexion Angle */}
+          {/* Card 2: Real-time Flexion Angle & Similarity Score */}
           <div className="bg-[#000000]/80 border border-white/20 rounded-2xl p-3 flex flex-col items-center text-center backdrop-blur-md">
             <span className="font-mono text-[10px] text-[#979797] uppercase font-bold tracking-tight">
               SUDUT FLEKSI
@@ -419,14 +416,11 @@ export default function Tracking() {
                     : 'text-[#d1ffca]'
                 }`}
               >
-                {currentSimilarityScore}%
-              </span>
-              <span className="text-xs font-mono text-[#979797]">
-                /100%
+                {Math.round(currentAngle)}°
               </span>
             </div>
             <span className="font-mono text-[9px] text-[#979797] uppercase tracking-tighter mt-1.5">
-              SKOR KEMIRIPAN
+              KEMIRIPAN: {currentSimilarityScore}%
             </span>
           </div>
 

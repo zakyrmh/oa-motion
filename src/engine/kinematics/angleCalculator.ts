@@ -62,6 +62,24 @@ export function calculateKneeAngle3D(
 }
 
 /**
+ * Sudut FLEKSI lutut 3D (0° = lurus sempurna, membesar seiring lutut menekuk).
+ * Ini yang harus dipakai untuk tracking latihan, karena data referensi
+ * (dari ReferenceRecorder / calculateKneeAngle 2D) memakai skala yang sama.
+ * calculateKneeAngle3D (sudut interior mentah, ~180°=lurus) TIDAK cocok
+ * dibandingkan langsung dengan data referensi berskala fleksi.
+ */
+export function calculateKneeFlexionAngle3D(
+  hip: Point3D,
+  knee: Point3D,
+  ankle: Point3D
+): number {
+  const interiorAngle = calculateJointAngle3D(hip, knee, ankle);
+  const flexionAngle = 180 - interiorAngle;
+  const normalized = Math.max(0.0, Math.min(180.0, flexionAngle));
+  return Math.round(normalized * 10) / 10;
+}
+
+/**
  * Convenience helper specifically for Knee Flexion Angle (Hip - Knee - Ankle).
  * Calculates the flexion angle: 180 - theta, representing how much the knee is bent from straight (0°).
  * Validates that all joints have a visibility score of at least 0.60, or estimates the knee position
@@ -72,13 +90,13 @@ export function calculateKneeAngle(
   knee: Point2D,
   ankle: Point2D,
   side: 'left' | 'right' = 'left'
-): number {
+): number | null {
   // Validasi visibilitas dasar untuk Hip dan Ankle
   if (
     (hip.visibility !== undefined && hip.visibility < 0.60) ||
     (ankle.visibility !== undefined && ankle.visibility < 0.60)
   ) {
-    return 0.0;
+    return null; // Gagal deteksi — jangan disamakan dengan 0.0 (lutut lurus)
   }
 
   let activeKnee = knee;
@@ -87,7 +105,7 @@ export function calculateKneeAngle(
   if (knee.visibility !== undefined && knee.visibility < 0.60) {
     const estimated = estimateKneePosition(hip, ankle, side);
     if (!estimated) {
-      return 0.0; // Gagal estimasi karena tidak ada data historis valid sebelumnya
+      return null; // Gagal estimasi karena tidak ada data historis valid sebelumnya
     }
     activeKnee = estimated;
   } else {
@@ -105,4 +123,30 @@ export function calculateKneeAngle(
 
   // Bulatkan ke satu desimal
   return Math.round(normalized * 10) / 10;
+}
+
+/**
+ * Sudut sendi ankle (Knee - Ankle - Foot) versi 2D dengan validasi visibilitas.
+ * Sebelumnya ankle dihitung langsung lewat calculateJointAngle3D tanpa pengecekan
+ * apapun, sehingga titik dengan confidence rendah (kaki tertutup/terpotong frame)
+ * tetap dipakai dan menghasilkan angka yang melompat-lompat.
+ *
+ * Mengembalikan null (bukan 0) jika data tidak layak dipakai, supaya caller bisa
+ * memilih untuk mempertahankan nilai terakhir yang valid alih-alih menampilkan
+ * atau merekam angka 0 yang salah.
+ */
+export function calculateAnkleAngle(
+  knee: Point2D,
+  ankle: Point2D,
+  foot: Point2D
+): number | null {
+  if (
+    (knee.visibility !== undefined && knee.visibility < 0.60) ||
+    (ankle.visibility !== undefined && ankle.visibility < 0.60) ||
+    (foot.visibility !== undefined && foot.visibility < 0.60)
+  ) {
+    return null;
+  }
+
+  return calculateJointAngle2D(knee, ankle, foot);
 }

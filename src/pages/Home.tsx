@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Database, HeartHandshake, ShieldAlert } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Database, HeartHandshake, ShieldAlert, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AppLayout } from '@/components/layouts/AppLayout';
 import { Header } from '@/components/common/Header';
 import { useMedicalProfile } from '@/hooks/useMedicalProfile';
+import { TARGET_KNEE_OPTIONS } from '@/constants/clinical';
 import type { AssistanceStatus, CapabilityLevel } from '@/types/clinical';
 
 const capabilityOptions: Array<{ id: CapabilityLevel; title: string; description: string }> = [
@@ -54,8 +55,34 @@ export default function Home() {
           </div>
         </section>
 
+        <div className="p-3.5 bg-[#d1ffca] rounded-2xl border border-[#000000] text-xs text-[#000000] font-medium">
+          <strong>Arti sudut fleksi:</strong> berdiri tegak = 0°, sudut siku-siku = 90°,
+          sedangkan 100° berarti lutut menekuk lebih dalam dari siku-siku. Angka ini bukan
+          sudut internal antara paha dan betis.
+        </div>
+
+        <section className="flex flex-col gap-3" aria-labelledby="target-knee-heading">
+          <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-[#979797]">03 //</span><h2 id="target-knee-heading" className="text-lg font-bold uppercase tracking-tight">SISI LUTUT TARGET</h2></div>
+          <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Sisi lutut target">
+            {TARGET_KNEE_OPTIONS.map((option) => {
+              const selected = profile.targetKnee === option.id;
+              return (
+                <Card key={option.id} role="radio" aria-checked={selected} tabIndex={0} onClick={() => updateProfile({ targetKnee: option.id })} className={`cursor-pointer rounded-3xl border-2 p-4 shadow-none ${selected ? 'border-black bg-white ring-4 ring-[#d1ffca]' : 'border-[#c6c6c6] bg-white hover:border-black'}`}>
+                  <CardContent className="flex items-start justify-between gap-2 p-0">
+                    <div>
+                      <h3 className="text-base font-bold text-black">{option.title}</h3>
+                      <p className="mt-0.5 text-xs font-medium text-[#444444]">{option.desc}</p>
+                    </div>
+                    {selected && <Target className="size-6 shrink-0 text-black" />}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="flex flex-col gap-3" aria-labelledby="assistance-heading">
-          <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-[#979797]">03 //</span><h2 id="assistance-heading" className="text-lg font-bold uppercase tracking-tight">STATUS PENDAMPINGAN</h2></div>
+          <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-[#979797]">04 //</span><h2 id="assistance-heading" className="text-lg font-bold uppercase tracking-tight">STATUS PENDAMPINGAN</h2></div>
           <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Status pendampingan">
             {assistanceOptions.map((option) => {
               const selected = profile.pendampingan === option.id;
@@ -65,12 +92,12 @@ export default function Home() {
         </section>
 
         <section className="flex flex-col gap-3" aria-labelledby="target-heading">
-          <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-[#979797]">04 //</span><h2 id="target-heading" className="text-lg font-bold uppercase tracking-tight">TARGET REPETISI PER SESI</h2></div>
+          <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-[#979797]">05 //</span><h2 id="target-heading" className="text-lg font-bold uppercase tracking-tight">TARGET REPETISI PER SESI</h2></div>
           <Card className="rounded-3xl border-none bg-white p-5 shadow-none"><div className="flex items-center gap-4"><input type="range" min="2" max="20" step="1" value={profile.targetRepetisiPerSesi} onChange={(event) => updateProfile({ targetRepetisiPerSesi: Number(event.target.value) })} aria-label="Target repetisi per sesi" className="w-full accent-black" /><output className="min-w-16 rounded-xl bg-black px-3 py-2 text-center font-mono text-xl font-bold text-[#d1ffca]">{profile.targetRepetisiPerSesi}x</output></div><div className="mt-2 flex justify-between font-mono text-xs font-bold text-[#444444]"><span>2 REP</span><span>20 REP</span></div></Card>
         </section>
 
         <section className="flex flex-col gap-3" aria-labelledby="family-heading">
-          <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-[#979797]">05 //</span><h2 id="family-heading" className="text-lg font-bold uppercase tracking-tight">KONTAK KELUARGA <span className="text-sm font-medium normal-case text-[#979797]">(opsional)</span></h2></div>
+          <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-[#979797]">06 //</span><h2 id="family-heading" className="text-lg font-bold uppercase tracking-tight">KONTAK KELUARGA <span className="text-sm font-medium normal-case text-[#979797]">(opsional)</span></h2></div>
           <input value={profile.kontakKeluarga ?? ''} onChange={(event) => updateProfile({ kontakKeluarga: event.target.value || undefined })} placeholder="Nomor WhatsApp atau telepon" aria-label="Kontak keluarga" className="h-14 rounded-2xl border-2 border-black bg-white px-4 text-lg font-semibold text-black outline-none placeholder:text-[#979797] focus:ring-4 focus:ring-[#d1ffca]" />
         </section>
       </main>

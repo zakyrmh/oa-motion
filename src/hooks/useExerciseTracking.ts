@@ -1,36 +1,36 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { UserProfile, SafetyZone } from '@/types/clinical';
+import type { UserProfile, SafetyZone, OAGrade } from '@/types/clinical';
 import type { ExercisePhase, Point3D, MovementType } from '@/types/kinematics';
 import type { RepetitionRecord, ExerciseSessionSummary } from '@/types/session';
 import { AUDIO_PHRASES } from '@/constants/audioPhrases';
-import { calculateKneeAngle3D } from '@/engine/kinematics/angleCalculator';
+import { calculateKneeFlexionAngle3D } from '@/engine/kinematics/angleCalculator';
 import { EMAFilter } from '@/engine/kinematics/emaFilter';
 import { calculateMovementSimilarity } from '@/engine/kinematics/dtwCalculator';
 import { getReferenceMovement } from '@/engine/kinematics/referenceDataLoader';
 import { AdaptiveFatigueTracker } from '@/engine/kinematics/fatigueDetector';
+import { determineSafetyZone, determineExercisePhase } from '@/engine/kinematics/rulesEngine';
 import { useAudioCoach } from './useAudioCoach';
 
 export interface UseExerciseTrackingOptions {
   profile: UserProfile;
 }
 
-const SIT_TO_STAND_REPS = 3;
-
-function getMovementForRep(capability: UserProfile['kapabilitas'], repCount: number): MovementType {
+function getMovementForRep(capability: UserProfile['kapabilitas']): MovementType {
   if (capability === 'hanya_duduk') return 'sit_to_stand';
-  return repCount < SIT_TO_STAND_REPS ? 'sit_to_stand' : 'squat';
+  return 'squat';
 }
 
 export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
   const audioCoach = useAudioCoach(false);
   const { speak, playSuccess, playWarning } = audioCoach;
   const targetReps = Math.max(2, Math.min(20, profile.targetRepetisiPerSesi));
+  const oaGrade: OAGrade = (profile as { oaGrade?: OAGrade }).oaGrade ?? 'grade2';
   const fatigueTrackerRef = useRef(new AdaptiveFatigueTracker());
   const [currentAngle, setCurrentAngle] = useState(0);
   const [currentZone, setCurrentZone] = useState<SafetyZone>('GREEN');
   const [currentSimilarityScore, setCurrentSimilarityScore] = useState(100);
   const [exercisePhase, setExercisePhase] = useState<ExercisePhase>('REST');
-  const [activeMovement, setActiveMovement] = useState<MovementType>('sit_to_stand');
+  const [activeMovement, setActiveMovement] = useState<MovementType>('squat');
   const [repsCompleted, setRepsCompleted] = useState(0);
   const [redZoneWarnings, setRedZoneWarnings] = useState(0);
   const [maxFlexionReached, setMaxFlexionReached] = useState(0);
@@ -40,9 +40,9 @@ export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
   const [isFinished, setIsFinished] = useState(false);
 
   const emaFilterRef = useRef(new EMAFilter(0.25));
-  const previousAngleRef = useRef(180);
+  const previousAngleRef = useRef(0);
   const stageRef = useRef<'UP' | 'DOWN' | 'HOLD'>('UP');
-  const currentRepDeepestAngleRef = useRef(180);
+  const currentRepDeepestAngleRef = useRef(0);
   const currentRepHadRedRef = useRef(false);
   const currentRepHoldFramesRef = useRef(0);
   const currentRepStartedAtRef = useRef<number | null>(null);
@@ -77,105 +77,188 @@ export function useExerciseTracking({ profile }: UseExerciseTrackingOptions) {
     const ankle = landmarks[ankleIndex];
     if (!hip || !knee || !ankle) return;
 
-    const smoothedAngle = emaFilterRef.current.filter(calculateKneeAngle3D(hip, knee, ankle));
+    const smoothedAngle = emaFilterRef.current.filter(calculateKneeFlexionAngle3D(hip, knee, ankle));
     const previousAngle = previousAngleRef.current;
     previousAngleRef.current = smoothedAngle;
     setCurrentAngle(smoothedAngle);
-    const phase: ExercisePhase = smoothedAngle < 25 ? 'REST' : smoothedAngle >= 30 ? 'FLEXION' : 'EXTENSION';
+
+    // Evaluasi zona keselamatan klinis real-time
+    const clinicalZone = determineSafetyZone(smoothedAngle, oaGrade);
+    setCurrentZone(clinicalZone);
+
+    const phase = determineExercisePhase(smoothedAngle, previousAngle, oaGrade);
     setExercisePhase(phase);
 
-    if (smoothedAngle < maxFlexionReachedRef.current || maxFlexionReachedRef.current === 0) {
+    if (smoothedAngle > maxFlexionReachedRef.current) {
       maxFlexionReachedRef.current = smoothedAngle;
       setMaxFlexionReached(smoothedAngle);
     }
 
     const now = performance.now();
-    const movement = getMovementForRep(profile.kapabilitas, repsCompletedRef.current);
+    const movement = getMovementForRep(profile.kapabilitas);
     setActiveMovement(movement);
     const reference = getReferenceMovement(movement);
     const isSitToStand = movement === 'sit_to_stand';
-    const startsCycle = isSitToStand ? smoothedAngle <= 120 : smoothedAngle < 150;
-    const completesCycle = isSitToStand
-      ? cycleStartedRef.current && reachedStandingRef.current && smoothedAngle <= 120
-      : cycleStartedRef.current && stageRef.current === 'HOLD' && smoothedAngle >= 165;
 
-    if (!cycleStartedRef.current && startsCycle) {
-      cycleStartedRef.current = true;
-      reachedStandingRef.current = false;
-      currentRepStartedAtRef.current = now;
-      currentSeriesRef.current = [previousAngle, smoothedAngle];
-      currentRepDeepestAngleRef.current = smoothedAngle;
-      stageRef.current = 'DOWN';
-    } else if (cycleStartedRef.current) {
-      currentSeriesRef.current.push(smoothedAngle);
-      currentRepDeepestAngleRef.current = Math.min(currentRepDeepestAngleRef.current, smoothedAngle);
-      if (smoothedAngle >= 165) reachedStandingRef.current = true;
-      if (!isSitToStand && smoothedAngle <= 120) stageRef.current = 'HOLD';
-      if (smoothedAngle > previousAngle) currentRepHoldFramesRef.current += 1;
-    }
-
-    if (cycleStartedRef.current && currentSeriesRef.current.length >= 8) {
-      const similarity = calculateMovementSimilarity(currentSeriesRef.current.slice(-120), reference.angleTimeSeries);
-      setCurrentSimilarityScore(similarity.similarityScorePercent);
-      setCurrentZone(similarity.zone);
-      if (similarity.zone === 'RED') {
-        currentRepHadRedRef.current = true;
-        if (now - lastWarningTimeRef.current > 2500) {
-          redZoneWarningsRef.current += 1;
-          setRedZoneWarnings(redZoneWarningsRef.current);
-          playWarning();
-          speak('Perhatikan bentuk gerakan dan kurangi kedalaman.');
-          lastWarningTimeRef.current = now;
-        }
-        setCoachMessage('Skor gerakan menurun. Kembali ke posisi yang nyaman.');
-      } else if (similarity.zone === 'YELLOW') {
-        setCoachMessage(`Skor kemiripan ${similarity.similarityScorePercent}%. Jaga gerakan tetap perlahan.`);
+    // Peringatan zona merah klinis real-time saat fleksi melebihi batas aman
+    if (clinicalZone === 'RED') {
+      currentRepHadRedRef.current = true;
+      if (now - lastWarningTimeRef.current > 2500) {
+        redZoneWarningsRef.current += 1;
+        setRedZoneWarnings(redZoneWarningsRef.current);
+        playWarning();
+        speak('Perhatian: Fleksi lutut melebihi batas aman. Kurangi kedalaman.');
+        lastWarningTimeRef.current = now;
       }
+      setCoachMessage('Lutut menekuk terlalu dalam! Kurangi kedalaman gerakan.');
     }
 
-    if (completesCycle) {
-      if (currentSeriesRef.current.length >= 8) {
+    // Finite State Machine (FSM) untuk deteksi siklus repetisi
+    if (isSitToStand) {
+      // SIT-TO-STAND: Mulai saat duduk (fleksi >= 70°), berdiri (fleksi <= 20°), lalu duduk kembali (fleksi >= 70°)
+      const startsCycle = !cycleStartedRef.current && smoothedAngle >= 60;
+      const completesCycle = cycleStartedRef.current && reachedStandingRef.current && smoothedAngle >= 60 && currentSeriesRef.current.length >= 8;
+
+      if (startsCycle) {
+        cycleStartedRef.current = true;
+        reachedStandingRef.current = false;
+        currentRepStartedAtRef.current = now;
+        currentSeriesRef.current = [previousAngle, smoothedAngle];
+        currentRepDeepestAngleRef.current = smoothedAngle;
+        stageRef.current = 'UP';
+        setCoachMessage('Mulai berdiri perlahan dan luruskan badan.');
+      } else if (cycleStartedRef.current) {
+        currentSeriesRef.current.push(smoothedAngle);
+        if (smoothedAngle <= 20) {
+          reachedStandingRef.current = true;
+          setCoachMessage('Bagus! Sekarang duduk kembali dengan terkontrol.');
+        }
+      }
+
+      if (completesCycle) {
         const nextRepIndex = repsCompletedRef.current + 1;
         const durationMs = currentRepStartedAtRef.current ? Math.round(now - currentRepStartedAtRef.current) : undefined;
-        const similarity = currentSeriesRef.current.length >= 8
-          ? calculateMovementSimilarity(currentSeriesRef.current, reference.angleTimeSeries)
-          : { similarityScorePercent: 0, zone: 'RED' as SafetyZone };
+        const similarity = calculateMovementSimilarity(currentSeriesRef.current, reference.angleTimeSeries);
+        setCurrentSimilarityScore(similarity.similarityScorePercent);
+
         const record: RepetitionRecord = {
           repIndex: nextRepIndex,
           maxFlexionAngle: Math.round(currentRepDeepestAngleRef.current * 10) / 10,
           holdDurationSeconds: Math.round((currentRepHoldFramesRef.current / 30) * 10) / 10,
           durationMs,
-          isSafeRoM: !currentRepHadRedRef.current && similarity.similarityScorePercent >= 60,
+          isSafeRoM: !currentRepHadRedRef.current && similarity.similarityScorePercent >= 50,
           formScore: similarity.similarityScorePercent,
           movementType: movement,
           similarityScore: similarity.similarityScorePercent,
           timestamp: Date.now(),
         };
+
         const fatigueEvaluation = fatigueTrackerRef.current.recordRepetition(record);
         record.fatigueFlag = fatigueEvaluation.fatigueFlag;
         if (fatigueEvaluation.fatigueFlag) {
           setFatigueFlag(true);
           setCoachMessage(fatigueEvaluation.reason ?? 'Indikasi kelelahan terdeteksi. Istirahat sebentar.');
         }
+
         repetitionRecordsRef.current.push(record);
         repsCompletedRef.current = nextRepIndex;
         setRepsCompleted(nextRepIndex);
         playSuccess();
         speak(AUDIO_PHRASES.EXERCISE.REP_SUCCESS(nextRepIndex, targetReps));
+
         if (nextRepIndex >= targetReps) setCoachMessage('Target selesai. Sesi latihan hari ini tuntas.');
-        else if (profile.kapabilitas === 'duduk_dan_berdiri' && nextRepIndex === SIT_TO_STAND_REPS) setCoachMessage('Tahap sit-to-stand selesai. Berikutnya squat bertahap.');
-        else setCoachMessage(`Bagus. Repetisi ke-${nextRepIndex} selesai.`);
+        else setCoachMessage(`Bagus! Repetisi ke-${nextRepIndex} selesai. Skor: ${similarity.similarityScorePercent}%.`);
+
+        // Reset siklus
+        cycleStartedRef.current = false;
+        reachedStandingRef.current = false;
+        stageRef.current = 'UP';
+        currentRepDeepestAngleRef.current = 0;
+        currentRepHadRedRef.current = false;
+        currentRepHoldFramesRef.current = 0;
+        currentRepStartedAtRef.current = null;
+        currentSeriesRef.current = [];
       }
-      cycleStartedRef.current = false;
-      reachedStandingRef.current = false;
-      stageRef.current = 'UP';
-      currentRepDeepestAngleRef.current = 180;
-      currentRepHadRedRef.current = false;
-      currentRepHoldFramesRef.current = 0;
-      currentRepStartedAtRef.current = null;
-      currentSeriesRef.current = [];
+    } else {
+      // SQUAT: Mulai dari berdiri tegak (<= 20°), menekuk lutut (>= 25°), lalu kembali berdiri tegak (<= 20°)
+      const startsCycle = !cycleStartedRef.current && smoothedAngle >= 25;
+      const completesCycle = cycleStartedRef.current && currentRepDeepestAngleRef.current >= 30 && smoothedAngle <= 20 && currentSeriesRef.current.length >= 8;
+
+      if (startsCycle) {
+        cycleStartedRef.current = true;
+        reachedStandingRef.current = false;
+        currentRepStartedAtRef.current = now;
+        currentSeriesRef.current = [previousAngle, smoothedAngle];
+        currentRepDeepestAngleRef.current = smoothedAngle;
+        stageRef.current = 'DOWN';
+        setCoachMessage('Tekuk lutut perlahan sesuai batas kemampuan.');
+      } else if (cycleStartedRef.current) {
+        currentSeriesRef.current.push(smoothedAngle);
+        currentRepDeepestAngleRef.current = Math.max(currentRepDeepestAngleRef.current, smoothedAngle);
+
+        if (smoothedAngle >= 35 && Math.abs(smoothedAngle - previousAngle) < 1.0) {
+          currentRepHoldFramesRef.current += 1;
+        }
+
+        if (smoothedAngle < previousAngle - 0.5) {
+          stageRef.current = 'UP';
+          if (clinicalZone !== 'RED') {
+            setCoachMessage('Dorong tubuh naik kembali ke posisi berdiri tegak.');
+          }
+        }
+      } else {
+        // Posisi berdiri diam di luar siklus gerakan
+        if (clinicalZone === 'GREEN' && repsCompletedRef.current > 0 && repsCompletedRef.current < targetReps) {
+          setCoachMessage(`Bagus. Lanjutkan repetisi ke-${repsCompletedRef.current + 1}.`);
+        }
+      }
+
+      if (completesCycle) {
+        const nextRepIndex = repsCompletedRef.current + 1;
+        const durationMs = currentRepStartedAtRef.current ? Math.round(now - currentRepStartedAtRef.current) : undefined;
+        const similarity = calculateMovementSimilarity(currentSeriesRef.current, reference.angleTimeSeries);
+        setCurrentSimilarityScore(similarity.similarityScorePercent);
+
+        const record: RepetitionRecord = {
+          repIndex: nextRepIndex,
+          maxFlexionAngle: Math.round(currentRepDeepestAngleRef.current * 10) / 10,
+          holdDurationSeconds: Math.round((currentRepHoldFramesRef.current / 30) * 10) / 10,
+          durationMs,
+          isSafeRoM: !currentRepHadRedRef.current && similarity.similarityScorePercent >= 50,
+          formScore: similarity.similarityScorePercent,
+          movementType: movement,
+          similarityScore: similarity.similarityScorePercent,
+          timestamp: Date.now(),
+        };
+
+        const fatigueEvaluation = fatigueTrackerRef.current.recordRepetition(record);
+        record.fatigueFlag = fatigueEvaluation.fatigueFlag;
+        if (fatigueEvaluation.fatigueFlag) {
+          setFatigueFlag(true);
+          setCoachMessage(fatigueEvaluation.reason ?? 'Indikasi kelelahan terdeteksi. Istirahat sebentar.');
+        }
+
+        repetitionRecordsRef.current.push(record);
+        repsCompletedRef.current = nextRepIndex;
+        setRepsCompleted(nextRepIndex);
+        playSuccess();
+        speak(AUDIO_PHRASES.EXERCISE.REP_SUCCESS(nextRepIndex, targetReps));
+
+        if (nextRepIndex >= targetReps) setCoachMessage('Target selesai. Sesi latihan hari ini tuntas.');
+        else setCoachMessage(`Bagus! Repetisi ke-${nextRepIndex} selesai. Skor: ${similarity.similarityScorePercent}%.`);
+
+        // Reset siklus
+        cycleStartedRef.current = false;
+        reachedStandingRef.current = false;
+        stageRef.current = 'UP';
+        currentRepDeepestAngleRef.current = 0;
+        currentRepHadRedRef.current = false;
+        currentRepHoldFramesRef.current = 0;
+        currentRepStartedAtRef.current = null;
+        currentSeriesRef.current = [];
+      }
     }
-  }, [isFinished, playSuccess, playWarning, profile.kapabilitas, profile.targetKnee, speak, targetReps]);
+  }, [isFinished, oaGrade, playSuccess, playWarning, profile.kapabilitas, profile.targetKnee, speak, targetReps]);
 
   const finishSession = useCallback((): ExerciseSessionSummary => {
     setIsFinished(true);
