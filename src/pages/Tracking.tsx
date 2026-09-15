@@ -235,24 +235,24 @@ export default function Tracking() {
     switch (currentZone) {
       case 'GREEN':
         return {
-          title: 'ZONA HIJAU // GERAKAN SERASI',
-          desc: `Skor kemiripan ${currentSimilarityScore}%. Gerakan terkontrol.`,
+          title: 'ZONA HIJAU // RENTANG AMAN',
+          desc: `Sudut fleksi ${Math.round(currentAngle)}°. Berada dalam batas aman fisioterapi.`,
           bg: 'bg-[#d1ffca] text-[#000000]',
           border: 'border-[#d1ffca]',
           icon: <Activity className="size-5 text-[#000000]" />,
         };
       case 'YELLOW':
         return {
-          title: 'ZONA KUNING // PERLU DISESUAIKAN',
-          desc: `Skor kemiripan ${currentSimilarityScore}%. Perlambat dan ikuti pola referensi.`,
+          title: 'ZONA KUNING // MENDEKATI BATAS MAKSIMAL',
+          desc: `Sudut fleksi ${Math.round(currentAngle)}°. Tahan sejenak lalu luruskan kembali perlahan.`,
           bg: 'bg-[#fff100] text-[#000000]',
           border: 'border-[#fff100]',
           icon: <AlertTriangle className="size-5 text-[#000000]" />,
         };
       case 'RED':
         return {
-          title: 'ZONA MERAH // HENTIKAN SEMENTARA',
-          desc: `Skor kemiripan ${currentSimilarityScore}%. Kembali ke posisi nyaman.`,
+          title: 'ZONA MERAH // MELEBIHI BATAS AMAN',
+          desc: `Sudut fleksi ${Math.round(currentAngle)}°. Lutut menekuk terlalu dalam, segera kurangi kedalaman!`,
           bg: 'bg-[#EF4444] text-[#ffffff] animate-pulse',
           border: 'border-[#DC2626]',
           icon: <ShieldAlert className="size-5 text-[#ffffff]" />,
@@ -401,7 +401,7 @@ export default function Tracking() {
             </div>
           </div>
 
-          {/* Card 2: Real-time Flexion Angle */}
+          {/* Card 2: Real-time Flexion Angle & Similarity Score */}
           <div className="bg-[#000000]/80 border border-white/20 rounded-2xl p-3 flex flex-col items-center text-center backdrop-blur-md">
             <span className="font-mono text-[10px] text-[#979797] uppercase font-bold tracking-tight">
               SUDUT FLEKSI
@@ -416,14 +416,11 @@ export default function Tracking() {
                     : 'text-[#d1ffca]'
                 }`}
               >
-                {currentSimilarityScore}%
-              </span>
-              <span className="text-xs font-mono text-[#979797]">
-                /100%
+                {Math.round(currentAngle)}°
               </span>
             </div>
             <span className="font-mono text-[9px] text-[#979797] uppercase tracking-tighter mt-1.5">
-              SKOR KEMIRIPAN
+              KEMIRIPAN: {currentSimilarityScore}%
             </span>
           </div>
 
